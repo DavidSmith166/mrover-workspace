@@ -68,7 +68,7 @@ class Encoder(VelSensor):
 
 
 class GPS(VelSensor, PosSensor, BearingSensor):
-    #Class for GPS daa
+    #Class for GPS data
     #TODO
 
     def __init__(self):
