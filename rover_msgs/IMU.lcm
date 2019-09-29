@@ -11,4 +11,5 @@ struct IMU {
     double mag_y;
     double mag_z;
     double bearing;
+    double pitch;
 }
