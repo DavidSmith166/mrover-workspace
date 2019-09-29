@@ -44,7 +44,9 @@ class BearingSensor(ABC):
 
 class IMU(AccelSensor, BearingSensor):
     #Class for IMU data
+    #TODO
 
+    #num_prev_bearings?
     def __init__(self):
         AccelSensor.__init__(self)
         BearingSensor.__init__(self)
@@ -55,3 +57,38 @@ class IMU(AccelSensor, BearingSensor):
         self._mag_y = None
         self._mag_z = None
 
+
+class Encoder(VelSensor):
+    #Class for wheel encoder data
+    #TODO
+
+    def __init__(self):
+        VelSensor.__init__(self)
+        self._raw_speed = None
+
+
+class GPS(VelSensor, PosSensor, BearingSensor):
+    #Class for GPS daa
+    #TODO
+
+    def __init__(self):
+        VelSensor.__init__(self)
+        PosSensor.__init__(self)
+        BearingSensor.__init__(self)
+
+
+class Phone(PosSensor, BearingSensor):
+    #Class for burner phone data
+    #TODO
+
+    def __init__(self):
+        PosSensor.__init__(self)
+        BearingSensor.__init__(self)
+
+
+class RTK(PosSensor):
+    #Class for RTK data
+    #TODO
+
+    def __init(self):
+        PosSensor.__init__(self)
