@@ -4,10 +4,16 @@ from abc import ABC
 class AccelSensor(ABC):
     #Abstract class for acceleration sensors
 
+    #Convert to absolute here or when fusing accel?
     def __init__(self):
         self._accel_x = None
         self._accel_y = None
         self._accel_z = None
+
+    #Converts _accel_x and _accel_y to absolute components
+    def absolutify(self, bearing, pitch):
+        #TODO
+        pass
     
     #Separate method for pure acceleration sensors?
 
@@ -15,12 +21,12 @@ class AccelSensor(ABC):
 class VelSensor(ABC):
     #Abstract class for velocity sensors
 
+    #Separate here or when fusing vel?
     def __init__(self):
-        self._vel_x = None
-        self._vel_y = None
+        self._vel_raw = None
     
-    #Separates speed into its x-y components
-    def separate(self, raw_speed, bearing):
+    #Separates _vel_raw into absolute components
+    def separateAbsolute(self, bearing):
         #TODO
         pass
 
@@ -64,7 +70,6 @@ class Encoder(VelSensor):
 
     def __init__(self):
         VelSensor.__init__(self)
-        self._raw_speed = None
 
 
 class GPS(VelSensor, PosSensor, BearingSensor):
