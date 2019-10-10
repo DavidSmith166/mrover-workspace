@@ -10,11 +10,18 @@ class RawAccelSensor(ABC):
         self.accel_y = None
         self.accel_z = None
 
+    #Are acceleration sensors generic/standardized enough to allow this?
+    def update(self, new_accel_sensor):
+        self.accel_x = new_accel_sensor.accel_x
+        self.accel_y = new_accel_sensor.accel_y
+        self.accel_z = new_accel_sensor.accel_z
+
     #Converts acceleration to absolute components
     def absolutify(self, bearing, pitch):
         if self.accel_x is None or bearing is None or pitch is None:
             return None
 
+        #TODO confirm math
         _accel_north = self.accel_x * math.cos(pitch) * math.sin(90 - bearing)
         _accel_east = self.accel_x * math.cos(pitch) * math.cos(90 - bearing)
         _accel_z = self.accel_x * math.sin(pitch)
@@ -29,6 +36,9 @@ class RawVelSensor(ABC):
     #Separate here or when fusing vel?
     def __init__(self):
         self.vel_raw = None
+
+    def update(self, new_vel_sensor):
+        self.vel_raw = new_vel_sensor.speed
     
     #Separates vel_raw into absolute components
     def separateAbsolute(self, bearing):
@@ -52,6 +62,13 @@ class RawPosSensor(ABC):
         self.lat_min = None
         self.long_deg = None
         self.long_min = None
+    
+    def update(self, new_gps):
+        #Updates the GPS with new LCM data
+        self.lat_deg = new_gps.latitude_deg
+        self.lat_min = new_gps.latitude_min
+        self.long_deg = new_gps.longitude_deg
+        self.long_min = new_gps.longitude_min
 
 
 class RawBearingSensor(ABC):
@@ -61,10 +78,12 @@ class RawBearingSensor(ABC):
     def __init__(self):
         self.bearing = None
 
+    def update(self, new_bearing_sensor):
+        self.bearing = new_bearing_sensor.bearing
+
 
 class RawIMU(RawAccelSensor, RawBearingSensor):
     #Class for IMU data
-    #Moving average?
 
     def __init__(self):
         RawAccelSensor.__init__(self)
@@ -87,6 +106,8 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
 
 class RawEncoder(RawVelSensor):
     #Class for wheel encoder data
+    #Does the LCM message come with data for all four encoders?
+    #Should RawEncoder hold data for all four encoders?
 
     def __init__(self):
         RawVelSensor.__init__(self)
@@ -99,21 +120,30 @@ class RawEncoder(RawVelSensor):
 
 class RawGPS(RawVelSensor, RawPosSensor, RawBearingSensor):
     #Class for GPS data
-    #Moving average?
 
     def __init__(self):
         RawVelSensor.__init__(self)
         RawPosSensor.__init__(self)
         RawBearingSensor.__init__(self)
 
+    def update(self, new_gps):
+        #Updates the GPS with new LCM data
+        RawPosSensor.update(self, new_gps)
+        RawBearingSensor.update(self, new_gps)
+        RawBearingSensor.update(self, new_gps)
+
 
 class RawPhone(RawPosSensor, RawBearingSensor):
     #Class for burner phone data
-    #TODO
 
     def __init__(self):
         RawPosSensor.__init__(self)
         RawBearingSensor.__init__(self)
+
+    def update(self, new_phone):
+        #Updates the phone with new LCM data
+        RawPosSensor.update(self, new_phone)
+        RawBearingSensor.update(self, new_phone)
 
 
 class RawRTK(RawPosSensor):
