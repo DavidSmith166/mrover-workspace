@@ -4,8 +4,6 @@ from rover_common import aiolcm
 import asyncio
 from rover_msgs import IMU, GPS, NavStatus, Odometry, \
                        SensorPackage
-from rover_common.aiohelper import run_coroutines
-from .__main__ import SensorFusion
 
 class Logger:
     def __init__(self):
