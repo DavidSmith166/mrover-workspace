@@ -15,6 +15,7 @@ class Logger:
 
         self.writer = None
 
+    def run(self):
         #Create files and write headers
         self.write(['lat_deg','lat_min','long_deg','long_min','bearing','speed'], 'gps')
         self.write(['accel_x','accel_y','accel_z','gyro_x','gyro_y','gyro_z',\
@@ -64,3 +65,7 @@ class Logger:
         self.odom = Odometry.decode(msg)
         self.write([self.odom.lat_deg,self.odom.lat_min,self.odom.long_deg,self.odom.long_min,\
                     self.odom.bearing,self.odom.speed], 'odom')
+
+if __name__ == "__main__":
+    logger = Logger()
+    logger.run()
