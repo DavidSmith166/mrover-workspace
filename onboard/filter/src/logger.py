@@ -1,60 +1,74 @@
 import csv
 
 from rover_common import aiolcm
-import asyncio
+# from rover_common.aiohelper import run_coroutines
 from rover_msgs import IMU, GPS, NavStatus, Odometry, \
                        SensorPackage
 
-def run():
-    #Create files and write headers
-    write(['lat_deg','lat_min','long_deg','long_min','bearing','speed'], 'gps')
-    write(['accel_x','accel_y','accel_z','gyro_x','gyro_y','gyro_z',\
-                            'mag_x','mag_y','mag_z','bearing'], 'imu')
-    write(['nav_state','nav_state_name','completed_wps','missed_wps',\
-                            'total_wps','found_tbs','total_tbs'], 'navStatus')
-    write(['lat_deg','lat_min','long_deg','long_min','bearing','speed'], 'phone')
-    write(['lat_deg','lat_min','long_deg','long_min','bearing','speed'], 'odom')
 
-    #Subscribe to LCM channels
-    #Modify to accept new sensors
-    lcm = aiolcm.AsyncLCM()
-    lcm.subscribe("/gps", gps_callback)
-    lcm.subscribe("/imu", imu_callback)
-    lcm.subscribe("/nav_status", nav_status_callback)
-    lcm.subscribe("/sensor_package", phone_callback)
-    lcm.subscribe("/odometry", odom_callback)
+class Logger:
+    # TODO: write vs. append mode, record frequency
 
-def write(contents, type):
-    #Writes contents to the log specified by type
-    with open(type + 'Log.csv', mode='w') as log:
-        writer = csv.writer(log)
-        writer.writerow(contents)
+    def __init__(self):
+        # Create files and write headers
 
-def gps_callback(channel, msg):
-    gps = GPS.decode(msg)
-    write([gps.lat_deg,gps.lat_min,gps.long_deg,gps.long_min,\
-                gps.bearing,gps.speed], 'gps')
+        self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
+                    'speed'], 'gps')
+        self.write(['accel_x', 'accel_y', 'accel_z', 'gyro_x', 'gyro_y',
+                    'gyro_z', 'mag_x', 'mag_y', 'mag_z', 'bearing'], 'imu')
+        self.write(['nav_state', 'nav_state_name', 'completed_wps',
+                    'missed_wps', 'total_wps', 'found_tbs', 'total_tbs'],
+                   'navStatus')
+        self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
+                    'speed'], 'phone')
+        self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
+                    'speed'], 'odom')
 
-def phone_callback(channel, msg):
-    phone = SensorPackage.decode(msg)
-    write([phone.lat_deg,phone.lat_min,phone.long_deg,phone.long_min,\
-                phone.bearing,phone.speed], 'phone')
+        # Subscribe to LCM channels
+        # Modify to accept new sensors
+        self.lcm = aiolcm.AsyncLCM()
+        self.lcm.subscribe("/gps", self.gps_callback)
+        self.lcm.subscribe("/imu", self.imu_callback)
+        self.lcm.subscribe("/nav_status", self.nav_status_callback)
+        self.lcm.subscribe("/sensor_package", self.phone_callback)
+        self.lcm.subscribe("/odometry", self.odom_callback)
 
-def imu_callback(channel, msg):
-    imu = IMU.decode(msg)
-    write([imu.accel_x,imu.accel_y,imu.accel_z,imu.gyro_x,imu.gyro_y,\
-                imu.gyro_z,imu.mag_x,imu.mag_y,imu.mag_z,imu.bearing], 'imu')
+    def write(self, contents, type):
+        # Writes contents to the log specified by type
+        with open(type + 'Log.csv', mode='a') as log:
+            writer = csv.writer(log)
+            writer.writerow(contents)
 
-def nav_status_callback(channel, msg):
-    nav_status = NavStatus.decode(msg)
-    write([nav_status.nav_state,nav_status.nav_state_name,nav_status.completed_wps,\
-                nav_status.missed_wps,nav_status.total_wps,nav_status.found_tbs,\
-                nav_status.total_tbs], 'navStatus')
+    def gps_callback(self, channel, msg):
+        gps = GPS.decode(msg)
+        self.write([gps.lat_deg, gps.lat_min, gps.long_deg, gps.long_min,
+                    gps.bearing, gps.speed], 'gps')
 
-def odom_callback(channel, msg):
-    odom = Odometry.decode(msg)
-    write([odom.lat_deg,odom.lat_min,odom.long_deg,odom.long_min,\
-                odom.bearing,odom.speed], 'odom')
+    def phone_callback(self, channel, msg):
+        phone = SensorPackage.decode(msg)
+        self.write([phone.latitude_deg, phone.latitude_min,
+                    phone.longitude_deg, phone.longitude_min, phone.bearing,
+                    phone.speed], 'phone')
+
+    def imu_callback(self, channel, msg):
+        imu = IMU.decode(msg)
+        self.write([imu.accel_x, imu.accel_y, imu.accel_z, imu.gyro_x,
+                    imu.gyro_y, imu.gyro_z, imu.mag_x, imu.mag_y, imu.mag_z,
+                    imu.bearing], 'imu')
+
+    def nav_status_callback(self, channel, msg):
+        nav_status = NavStatus.decode(msg)
+        self.write([nav_status.nav_state, nav_status.nav_state_name,
+                    nav_status.completed_wps, nav_status.missed_wps,
+                    nav_status.total_wps, nav_status.found_tbs,
+                    nav_status.total_tbs], 'navStatus')
+
+    def odom_callback(self, channel, msg):
+        odom = Odometry.decode(msg)
+        self.write([odom.latitude_deg, odom.latitude_min,
+                    odom.longitude_deg, odom.longitude_min,
+                    odom.bearing_deg, odom.speed], 'odom')
+
 
 if __name__ == "__main__":
-    run()
+    logger = Logger()

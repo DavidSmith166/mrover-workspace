@@ -7,48 +7,11 @@ from os import getenv
 from rover_common import aiolcm
 import asyncio
 from rover_common.aiohelper import run_coroutines
-from rover_msgs import IMU, GPS, SensorPackage, Odometry
-from .inputs import RawGPS, RawPhone, RawIMU, Velocity2D, \
-                    PositionDegs
+from .rawmessages import RawIMU, RawGPS, RawSensorPackage, RawNavStatus
+from .filterObjects import NavState, Odom, LocationEstimate, \
+                           BearingEstimate, Acceleration, Velocity
+# temp
 from .logger import Logger
-from .linearKalman import LinearKalman
-from .conversions import meters2lat, meters2long, lat2meters, long2meters, \
-                        decimal2min
-# don't have nav status in here yet
-# TODO handle losing sensors
-
-
-class StateEstimate:
-    # class for the current state estimates
-
-    def __init__(self, lat_deg=None, lat_min=None, vel_north=None,
-                 long_deg=None, long_min=None, vel_west=None, bearing_degs=None):
-        self.pos = PositionDegs(lat_deg, long_deg, lat_min, long_min)
-        self.vel = Velocity2D(vel_north, vel_west)
-        self.bearing_degs = bearing_degs
-
-    def asLKFInput(self):
-        # Returns the state estimate as a list for filter input
-        return [self.pos.lat_deg, meters2lat(self.vel.north),
-                self.pos.long_deg, meters2long(self.vel.west,
-                                               self.pos.lat_deg)]
-
-    def updateFromLKF(self, numpy_array, bearing_degs):
-        # Updates the list from the numpy array output of the filter
-        self.pos.lat_deg = numpy_array[0]
-        self.pos.long_deg = numpy_array[2]
-        self.vel.north = lat2meters(numpy_array[1])
-        self.vel.west = long2meters(numpy_array[3], numpy_array[0])
-        self.bearing_degs = bearing_degs
-
-    def asOdom(self):
-        # Returns the current state estimate as an Odometry LCM object
-        odom = Odometry()
-        odom.latitude_deg, odom.latitude_min = decimal2min(self.pos.lat_deg)
-        odom.longitude_deg, odom.longitude_min = decimal2min(self.pos.long_deg)
-        odom.bearing_deg = self.bearing_degs
-        odom.speed = self.vel.pythagorean()
-        return odom
 
 
 class SensorFusion:
@@ -162,9 +125,18 @@ class SensorFusion:
 
 
 def main():
-    fuser = SensorFusion()
+    lcm_ = aiolcm.AsyncLCM()
+    filter_ = SensorFusion()
+
+    lcm_.subscribe("/gps", filter_.gps_callback)
+    lcm_.subscribe("/imu", filter_.imu_callback)
+    lcm_.subscribe("/nav_status", filter_.nav_status_callback)
+    lcm_.subscribe("/sensor_package", filter_.sensor_package_callback)
+
+    # temp
     logger = Logger()
-    run_coroutines(fuser.lcm.loop(), logger.lcm.loop(), fuser.run())
+
+    run_coroutines(lcm_.loop(), logger.lcm.loop(), filter_.calc_odom(lcm_))
 
 
 if __name__ == '__main__':
