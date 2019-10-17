@@ -21,7 +21,7 @@ def run():
     lcm.subscribe("/gps", gps_callback)
     lcm.subscribe("/imu", imu_callback)
     lcm.subscribe("/nav_status", nav_status_callback)
-    lcm.subscribe("/sensor_package", sensor_package_callback)
+    lcm.subscribe("/sensor_package", phone_callback)
     lcm.subscribe("/odometry", odom_callback)
 
 def write(contents, type):
@@ -47,7 +47,7 @@ def imu_callback(channel, msg):
 
 def nav_status_callback(channel, msg):
     nav_status = NavStatus.decode(msg)
-    write([nav_status.nav_state,nav_statusnav_state_name,nav_status.completed_wps,\
+    write([nav_status.nav_state,nav_status.nav_state_name,nav_status.completed_wps,\
                 nav_status.missed_wps,nav_status.total_wps,nav_status.found_tbs,\
                 nav_status.total_tbs], 'navStatus')
 
