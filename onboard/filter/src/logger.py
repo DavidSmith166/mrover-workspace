@@ -18,11 +18,11 @@ def run():
     #Subscribe to LCM channels
     #Modify to accept new sensors
     lcm = aiolcm.AsyncLCM()
-    lcm.subscribe("/gps", Logger.gps_callback)
-    lcm.subscribe("/imu", Logger.imu_callback)
-    lcm.subscribe("/nav_status", Logger.nav_status_callback)
-    lcm.subscribe("/sensor_package", Logger.sensor_package_callback)
-    lcm.subscribe("/odometry", Logger.odom_callback)
+    lcm.subscribe("/gps", gps_callback)
+    lcm.subscribe("/imu", imu_callback)
+    lcm.subscribe("/nav_status", nav_status_callback)
+    lcm.subscribe("/sensor_package", sensor_package_callback)
+    lcm.subscribe("/odometry", odom_callback)
 
 def write(contents, type):
     #Writes contents to the log specified by type
