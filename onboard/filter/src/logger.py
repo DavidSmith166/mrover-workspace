@@ -4,6 +4,7 @@ from rover_common import aiolcm
 # from rover_common.aiohelper import run_coroutines
 from rover_msgs import IMU, GPS, NavStatus, Odometry, \
                        SensorPackage
+# import os
 
 
 class Logger:
@@ -11,6 +12,9 @@ class Logger:
 
     def __init__(self):
         # Create files and write headers
+
+        # os.makedirs('/filter_logs', exist_ok=True)
+        # os.chdir('/filter_logs')
 
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
                     'speed'], 'gps')
@@ -41,8 +45,8 @@ class Logger:
 
     def gps_callback(self, channel, msg):
         gps = GPS.decode(msg)
-        self.write([gps.lat_deg, gps.lat_min, gps.long_deg, gps.long_min,
-                    gps.bearing, gps.speed], 'gps')
+        self.write([gps.latitude_deg, gps.latitude_min, gps.longitude_deg,
+                    gps.longitude_min, gps.bearing_deg, gps.speed], 'gps')
 
     def phone_callback(self, channel, msg):
         phone = SensorPackage.decode(msg)
