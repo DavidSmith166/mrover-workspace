@@ -1,20 +1,21 @@
 import csv
+import json
+import os
+import time
 
 from rover_common import aiolcm
 # from rover_common.aiohelper import run_coroutines
 from rover_msgs import IMU, GPS, NavStatus, Odometry, \
                        SensorPackage
-# import os
 
 
 class Logger:
-    # TODO: write vs. append mode, record frequency
 
     def __init__(self):
         # Create files and write headers
 
-        # os.makedirs('/filter_logs', exist_ok=True)
-        # os.chdir('/filter_logs')
+        path_self = os.path.abspath(os.path.dirname(__file__))
+        self.file_path = os.path.join(path_self, 'logs/')
 
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
                     'speed'], 'gps')
@@ -37,41 +38,65 @@ class Logger:
         self.lcm.subscribe("/sensor_package", self.phone_callback)
         self.lcm.subscribe("/odometry", self.odom_callback)
 
+        # Read in options from logConfig
+        config_path = getenv('MROVER_CONFIG')
+        config_path += "/config_filter/logConfig.json"
+        with open(config_path, "r") as config:
+            self.logConfig = json.load(config)
+
+        # Initialize sensor timestamps
+        self.gps_millis = time.time() * 1000;
+        self.phone_millis = time.time() * 1000;
+        self.imu_millis = time.time() * 1000;
+        self.nav_status_millis = time.time() * 1000;
+        self.odom_millis = time.time() * 1000;
+
     def write(self, contents, type):
         # Writes contents to the log specified by type
-        with open(type + 'Log.csv', mode='a') as log:
+        with open(self.file_path + type + 'Log.csv',
+                  mode=self.logConfig['mode']) as log:
             writer = csv.writer(log)
             writer.writerow(contents)
 
     def gps_callback(self, channel, msg):
         gps = GPS.decode(msg)
-        self.write([gps.latitude_deg, gps.latitude_min, gps.longitude_deg,
-                    gps.longitude_min, gps.bearing_deg, gps.speed], 'gps')
+        if (time.time() - self.gps_millis) > self.logConfig['rate_millis']['gps']
+            self.write([gps.latitude_deg, gps.latitude_min, gps.longitude_deg,
+                        gps.longitude_min, gps.bearing_deg, gps.speed], 'gps')
+            self.gps_millis = time.time()
 
     def phone_callback(self, channel, msg):
         phone = SensorPackage.decode(msg)
-        self.write([phone.latitude_deg, phone.latitude_min,
-                    phone.longitude_deg, phone.longitude_min, phone.bearing,
-                    phone.speed], 'phone')
+        if (time.time() - self.phone_millis) > self.logConfig['rate_millis']['phone']
+            self.write([phone.latitude_deg, phone.latitude_min,
+                        phone.longitude_deg, phone.longitude_min, phone.bearing,
+                        phone.speed], 'phone')
+            self.phone_millis = time.time()
 
     def imu_callback(self, channel, msg):
         imu = IMU.decode(msg)
-        self.write([imu.accel_x, imu.accel_y, imu.accel_z, imu.gyro_x,
-                    imu.gyro_y, imu.gyro_z, imu.mag_x, imu.mag_y, imu.mag_z,
-                    imu.bearing], 'imu')
+        if (time.time() - self.imu_millis) > self.logConfig['rate_millis']['imu']
+            self.write([imu.accel_x, imu.accel_y, imu.accel_z, imu.gyro_x,
+                        imu.gyro_y, imu.gyro_z, imu.mag_x, imu.mag_y, imu.mag_z,
+                        imu.bearing], 'imu')
+            self.imu_millis = time.time()
 
     def nav_status_callback(self, channel, msg):
         nav_status = NavStatus.decode(msg)
-        self.write([nav_status.nav_state, nav_status.nav_state_name,
-                    nav_status.completed_wps, nav_status.missed_wps,
-                    nav_status.total_wps, nav_status.found_tbs,
-                    nav_status.total_tbs], 'navStatus')
+        if (time.time() - self.nav_status_millis) > self.logConfig['rate_millis']['nav_ststus']
+            self.write([nav_status.nav_state, nav_status.nav_state_name,
+                        nav_status.completed_wps, nav_status.missed_wps,
+                        nav_status.total_wps, nav_status.found_tbs,
+                        nav_status.total_tbs], 'navStatus')
+            self.nav_status_millis = time.time()
 
     def odom_callback(self, channel, msg):
         odom = Odometry.decode(msg)
-        self.write([odom.latitude_deg, odom.latitude_min,
-                    odom.longitude_deg, odom.longitude_min,
-                    odom.bearing_deg, odom.speed], 'odom')
+        if (time.time() - self.odom_millis) > self.logConfig['rate_millis']['odom']
+            self.write([odom.latitude_deg, odom.latitude_min,
+                        odom.longitude_deg, odom.longitude_min,
+                        odom.bearing_deg, odom.speed], 'odom')
+            self.odom_millis = time.time()
 
 
 if __name__ == "__main__":
