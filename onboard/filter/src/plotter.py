@@ -20,7 +20,7 @@ class Plotter:
 
 
     def plotCoords(self, subplot_loc):
-        # Plots the coordinates from the data in the specified subplot
+        # Plots the coordinates from data in the specified subplot
 
         # Convert DMS to decimal
         long = self.data['long_deg'] + self.data['long_min']/60
@@ -43,8 +43,8 @@ class Plotter:
         cep_label = plot.gca().add_patch(cep_plot)
         _2drms_plot = plot.Circle((0, 0), radius=_2drms, color='g', fill=False)
         _2drms_label = plot.gca().add_patch(_2drms_plot)
-        _min = min(numpy.amin(delta_long)-sigma_long, numpy.amin(delta_lat)-sigma_lat)
-        _max = max(numpy.amax(delta_long)+sigma_long, numpy.amax(delta_lat)+sigma_long)
+        _min = min(numpy.amin(delta_long)-sigma_long, numpy.amin(delta_lat)-sigma_lat, -_2drms)
+        _max = max(numpy.amax(delta_long)+sigma_long, numpy.amax(delta_lat)+sigma_long, _2drms)
         plot.axis([_min, _max, _min, _max])
         plot.xticks(rotation=60)
         plot.xlabel('Delta Longitude')
@@ -53,7 +53,7 @@ class Plotter:
         plot.legend(handles=[cep_label, _2drms_label], labels=['CEP', '2DRMS'])
 
     def plotSpeed(self, subplot_loc):
-       # Plots the speed from the data in the specified subplot
+       # Plots the speed from data in the specified subplot
 
        # Plot
        plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
@@ -65,7 +65,7 @@ class Plotter:
        plot.title('Speed')
 
     def plotBearing(self, subplot_loc):
-       # Plots the speed from the data in the specified subplot
+       # Plots the bearing from data in the specified subplot
 
        # Plot
        plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
@@ -97,6 +97,11 @@ class Plotter:
             self.plotBearing([2, 2, 4])
         # elif data_type == 'all':
             # self.plotAll()
+        elif data_type == 'test':
+            self.readCsv('test')
+            self.plotCoords([1, 2, 1])
+            self.plotSpeed([2, 2, 2])
+            self.plotBearing([2, 2, 4])
         else:
             print('Invalid data type.')
             sys.exit()
