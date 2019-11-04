@@ -8,7 +8,8 @@ if __name__ == '__main__':
 
     with open(file_path + 'testLog.csv', 'w+') as log:
         writer = csv.writer(log)
-        writer.writerow(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing', 'speed'])
+        writer.writerow(['lat_deg', 'lat_min', 'long_deg',
+                         'long_min', 'bearing', 'speed'])
         sample = 100
         for i in range(0, sample):
             lat_min = random.uniform(16.25, 16.75)

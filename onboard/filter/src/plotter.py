@@ -3,7 +3,6 @@ import os
 import math
 import sys
 import matplotlib.pyplot as plot
-from matplotlib.ticker import FormatStrFormatter
 
 
 class Plotter:
@@ -15,9 +14,8 @@ class Plotter:
         file_path = os.path.join(path_self, 'logs/')
 
         # Read data
-        self.data = numpy.genfromtxt(file_path + type + 'Log.csv', delimiter = ',',
-                                names = True)
-
+        self.data = numpy.genfromtxt(file_path + type + 'Log.csv',
+                                     delimiter=',', names=True)
 
     def plotCoords(self, subplot_loc):
         # Plots the coordinates from data in the specified subplot
@@ -43,8 +41,10 @@ class Plotter:
         cep_label = plot.gca().add_patch(cep_plot)
         _2drms_plot = plot.Circle((0, 0), radius=_2drms, color='g', fill=False)
         _2drms_label = plot.gca().add_patch(_2drms_plot)
-        _min = min(numpy.amin(delta_long)-sigma_long, numpy.amin(delta_lat)-sigma_lat, -_2drms)
-        _max = max(numpy.amax(delta_long)+sigma_long, numpy.amax(delta_lat)+sigma_long, _2drms)
+        _min = min(numpy.amin(delta_long)-sigma_long,
+                   numpy.amin(delta_lat)-sigma_lat, -_2drms)
+        _max = max(numpy.amax(delta_long)+sigma_long,
+                   numpy.amax(delta_lat)+sigma_long, _2drms)
         plot.axis([_min, _max, _min, _max])
         plot.xticks(rotation=60)
         plot.xlabel('Delta Longitude')
@@ -53,28 +53,28 @@ class Plotter:
         plot.legend(handles=[cep_label, _2drms_label], labels=['CEP', '2DRMS'])
 
     def plotSpeed(self, subplot_loc):
-       # Plots the speed from data in the specified subplot
+        # Plots the speed from data in the specified subplot
 
-       # Plot
-       plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
-       plot.plot(range(0, self.data.shape[0]), self.data['speed'])
-       plot.axis([0, self.data.shape[0], numpy.amin(self.data['speed']),
+        # Plot
+        plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
+        plot.plot(range(0, self.data.shape[0]), self.data['speed'])
+        plot.axis([0, self.data.shape[0], numpy.amin(self.data['speed']),
                   numpy.amax(self.data['speed'])])
-       plot.xlabel('Entry')
-       plot.ylabel('Speed')
-       plot.title('Speed')
+        plot.xlabel('Entry')
+        plot.ylabel('Speed')
+        plot.title('Speed')
 
     def plotBearing(self, subplot_loc):
-       # Plots the bearing from data in the specified subplot
+        # Plots the bearing from data in the specified subplot
 
-       # Plot
-       plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
-       plot.plot(range(0, self.data.shape[0]), self.data['bearing'])
-       plot.axis([0, self.data.shape[0], numpy.amin(self.data['bearing']),
+        # Plot
+        plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
+        plot.plot(range(0, self.data.shape[0]), self.data['bearing'])
+        plot.axis([0, self.data.shape[0], numpy.amin(self.data['bearing']),
                   numpy.amax(self.data['bearing'])])
-       plot.xlabel('Entry')
-       plot.ylabel('Bearing')
-       plot.title('Bearing')
+        plot.xlabel('Entry')
+        plot.ylabel('Bearing')
+        plot.title('Bearing')
 
     def plot(self, data_type):
         # Decides what to plot
@@ -108,6 +108,7 @@ class Plotter:
 
         plot.tight_layout()
         plot.show()
+
 
 if __name__ == "__main__":
     # Get arguments
