@@ -45,6 +45,10 @@ class Plotter:
                    numpy.amin(delta_lat)-sigma_lat, -_2drms)
         _max = max(numpy.amax(delta_long)+sigma_long,
                    numpy.amax(delta_lat)+sigma_long, _2drms)
+        # May need to change tolerance
+        if abs(_min - _max) < 0.000000001:
+            _min -= 1
+            _max += 1
         plot.axis([_min, _max, _min, _max])
         plot.xticks(rotation=60)
         plot.xlabel('Delta Longitude')
