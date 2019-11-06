@@ -111,6 +111,7 @@ class Plotter:
             sys.exit()
 
         plot.tight_layout()
+        plot.suptitle(data_type)
         plot.show()
 
 
