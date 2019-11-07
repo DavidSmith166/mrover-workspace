@@ -22,7 +22,6 @@ class RawAccelSensor(ABC):
         if self.accel_x is None or bearing is None or pitch is None:
             return None
 
-        # TODO confirm math
         _accel_north = self.accel_x * math.cos(pitch) * math.sin(90 - bearing)
         _accel_east = self.accel_x * math.cos(pitch) * math.cos(90 - bearing)
         _accel_z = self.accel_x * math.sin(pitch)
@@ -80,7 +79,13 @@ class RawBearingSensor(ABC):
         self.bearing = None
 
     def update(self, new_bearing_sensor):
-        self.bearing = new_bearing_sensor.bearing
+        # Account for non-standardized LCM structs >:(
+        if hasattr(new_bearing_sensor, 'bearing'):
+            self.bearing = new_bearing_sensor.bearing
+            print('bearing')
+        else:
+            self.bearing = new_bearing_sensor.bearing_deg
+            print('bearing_deg')
 
 
 class RawIMU(RawAccelSensor, RawBearingSensor):
@@ -145,14 +150,6 @@ class RawPhone(RawPosSensor, RawBearingSensor):
         # Updates the phone with new LCM data
         RawPosSensor.update(self, new_phone)
         RawBearingSensor.update(self, new_phone)
-
-
-class RawRTK(RawPosSensor):
-    # Class for RTK data
-    # TODO
-
-    def __init(self):
-        RawPosSensor.__init__(self)
 
 
 class Acceleration:

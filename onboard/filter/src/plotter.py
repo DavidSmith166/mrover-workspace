@@ -6,6 +6,7 @@ import matplotlib.pyplot as plot
 
 
 class Plotter:
+    # Todo: GPS in physical units
 
     def readCsv(self, type):
         # Reads in the CSV file specified by log
@@ -51,9 +52,13 @@ class Plotter:
             _max += 1
         plot.axis([_min, _max, _min, _max])
         plot.xticks(rotation=60)
-        plot.xlabel('Delta Longitude')
-        plot.ylabel('Delta Latitude')
+        plot.xlabel('Delta Longitude (degrees)')
+        plot.ylabel('Delta Latitude (degrees)')
         plot.title('GPS Coordinates')
+        subplot = plot.subplot(1, 2, 1)
+        subplot.text(0.5, -0.2, 'Long-Variance: ' + str(numpy.var(long)) +
+                  '\nLat-Variance ' + str(numpy.var(lat)), ha='center',
+                  transform=subplot.transAxes)
         plot.legend(handles=[cep_label, _2drms_label], labels=['CEP', '2DRMS'])
 
     def plotSpeed(self, subplot_loc):
@@ -61,11 +66,11 @@ class Plotter:
 
         # Plot
         plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
-        plot.plot(range(0, self.data.shape[0]), self.data['speed'])
-        plot.axis([0, self.data.shape[0], numpy.amin(self.data['speed']),
+        plot.plot(range(0, 5*self.data.shape[0], 5), self.data['speed'])
+        plot.axis([0, 5*self.data.shape[0], numpy.amin(self.data['speed']),
                   numpy.amax(self.data['speed'])])
-        plot.xlabel('Entry')
-        plot.ylabel('Speed')
+        plot.xlabel('Time (seconds)')
+        plot.ylabel('Speed (idk)')
         plot.title('Speed')
 
     def plotBearing(self, subplot_loc):
@@ -73,11 +78,11 @@ class Plotter:
 
         # Plot
         plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
-        plot.plot(range(0, self.data.shape[0]), self.data['bearing'])
-        plot.axis([0, self.data.shape[0], numpy.amin(self.data['bearing']),
+        plot.plot(range(0, 5*self.data.shape[0], 5), self.data['bearing'])
+        plot.axis([0, 5*self.data.shape[0], numpy.amin(self.data['bearing']),
                   numpy.amax(self.data['bearing'])])
-        plot.xlabel('Entry')
-        plot.ylabel('Bearing')
+        plot.xlabel('Time (seconds)')
+        plot.ylabel('Bearing (degrees)')
         plot.title('Bearing')
 
     def plot(self, data_type):
