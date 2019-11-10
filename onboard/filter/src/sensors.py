@@ -27,8 +27,6 @@ class RawAccelSensor(ABC):
         _accel_z = self.accel_x * math.sin(pitch)
         return Acceleration(_accel_north, _accel_east, _accel_z)
 
-    # Separate method for pure acceleration sensors (do those even exist?)?
-
 
 class RawVelSensor(ABC):
     # Abstract class for velocity sensors
