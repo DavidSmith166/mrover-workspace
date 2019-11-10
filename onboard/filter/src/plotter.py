@@ -25,9 +25,29 @@ class Plotter:
         long = self.data['long_deg'] + self.data['long_min']/60
         lat = self.data['lat_deg'] + self.data['lat_min']/60
 
+        # Convert degrees to radians
+        for i in long:
+            i = (i / 180) * math.pi
+        for i in lat:
+            i = (i / 180) * math.pi
+
+        """
+        # Convert radians to meters
+        for i in range(len(long)):
+            long[i] = (111412.84*math.cos(lat[i]) - 93.5*math.cos(3*lat[i]) + 0.118*math.cos(5*lat[i])) * long[i]
+            lat[i] = (111132.92 - 559.82*math.cos(2*lat[i]) + 1.175*math.cos(4*lat[i]) - 0.0023*math.cos(6*lat[i])) * lat[i]
+        """
+
         # Calculate delta vectors
         delta_long = long - numpy.mean(long)
         delta_lat = lat - numpy.mean(lat)
+
+        """
+        # Convert radians to meters
+        for i in range(len(delta_long)):
+            delta_long[i] = (111412.84*math.cos(lat[i]) - 93.5*math.cos(3*lat[i]) + 0.118*math.cos(5*lat[i])) * delta_long[i]
+            delta_lat[i] = (111132.92 - 559.82*math.cos(2*lat[i]) + 1.175*math.cos(4*lat[i]) - 0.0023*math.cos(6*lat[i])) * delta_lat[i]
+        """
 
         # Calculate error circles
         sigma_long = numpy.std(delta_long)
@@ -52,11 +72,11 @@ class Plotter:
             _max += 1
         plot.axis([_min, _max, _min, _max])
         plot.xticks(rotation=60)
-        plot.xlabel('Delta Longitude (degrees)')
-        plot.ylabel('Delta Latitude (degrees)')
+        plot.xlabel('Delta Longitude (meters)')
+        plot.ylabel('Delta Latitude (meters)')
         plot.title('GPS Coordinates')
         subplot = plot.subplot(1, 2, 1)
-        subplot.text(0.5, -0.2, 'Long-Variance: ' + str(numpy.var(long)) +
+        subplot.text(0.5, -0.3, 'Long-Variance: ' + str(numpy.var(long)) +
                   '\nLat-Variance ' + str(numpy.var(lat)), ha='center',
                   transform=subplot.transAxes)
         plot.legend(handles=[cep_label, _2drms_label], labels=['CEP', '2DRMS'])
