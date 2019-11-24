@@ -5,7 +5,6 @@ from abc import ABC
 class RawAccelSensor(ABC):
     # Abstract class for acceleration sensors
 
-    # Convert to absolute here or when fusing accel?
     def __init__(self):
         self.accel_x = None
         self.accel_y = None
@@ -25,13 +24,12 @@ class RawAccelSensor(ABC):
         _accel_north = self.accel_x * math.cos(pitch) * math.sin(90 - bearing)
         _accel_east = self.accel_x * math.cos(pitch) * math.cos(90 - bearing)
         _accel_z = self.accel_x * math.sin(pitch)
-        return Acceleration(_accel_north, _accel_east, _accel_z)
+        return AbsAcceleration(_accel_north, _accel_east, _accel_z)
 
 
 class RawVelSensor(ABC):
     # Abstract class for velocity sensors
 
-    # Separate here or when fusing vel?
     def __init__(self):
         self.vel_raw = None
 
@@ -49,7 +47,7 @@ class RawVelSensor(ABC):
 
         _vel_north = self.vel_raw * math.sin(90 - bearing)
         _vel_east = self.vel_raw * math.cos(90 - bearing)
-        return Velocity(_vel_north, _vel_east, 0)
+        return AbsVelocity(_vel_north, _vel_east, 0)
 
 
 class RawPosSensor(ABC):
@@ -61,17 +59,15 @@ class RawPosSensor(ABC):
         self.long_deg = None
         self.long_min = None
 
-    def update(self, new_gps):
-        # Updates the GPS with new LCM data
-        self.lat_deg = new_gps.latitude_deg
-        self.lat_min = new_gps.latitude_min
-        self.long_deg = new_gps.longitude_deg
-        self.long_min = new_gps.longitude_min
+    def update(self, new_pos_sensor):
+        self.lat_deg = new_pos_sensor.latitude_deg
+        self.lat_min = new_pos_sensor.latitude_min
+        self.long_deg = new_pos_sensor.longitude_deg
+        self.long_min = new_pos_sensor.longitude_min
 
 
 class RawBearingSensor(ABC):
     # Abstract class for bearing sensors
-    # Moving average?
 
     def __init__(self):
         self.bearing = None
@@ -80,10 +76,8 @@ class RawBearingSensor(ABC):
         # Account for non-standardized LCM structs >:(
         if hasattr(new_bearing_sensor, 'bearing'):
             self.bearing = new_bearing_sensor.bearing
-            print('bearing')
         else:
             self.bearing = new_bearing_sensor.bearing_deg
-            print('bearing_deg')
 
 
 class RawIMU(RawAccelSensor, RawBearingSensor):
@@ -110,7 +104,6 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
 
 class RawEncoder(RawVelSensor):
     # Class for wheel encoder data
-    # Does the LCM message come with data for all four encoders?
     # Should RawEncoder hold data for all four encoders?
 
     def __init__(self):
@@ -132,8 +125,8 @@ class RawGPS(RawVelSensor, RawPosSensor, RawBearingSensor):
 
     def update(self, new_gps):
         # Updates the GPS with new LCM data
+        RawVelSensor.update(self, new_gps)
         RawPosSensor.update(self, new_gps)
-        RawBearingSensor.update(self, new_gps)
         RawBearingSensor.update(self, new_gps)
 
 
@@ -150,7 +143,7 @@ class RawPhone(RawPosSensor, RawBearingSensor):
         RawBearingSensor.update(self, new_phone)
 
 
-class Acceleration:
+class AbsAcceleration:
     # Class for absolute acceleration
     def __init__(self, north, east, z):
         self.north = north
@@ -158,7 +151,7 @@ class Acceleration:
         self.z = z
 
 
-class Velocity:
+class AbsVelocity:
     # Class for absolute velocity
     def __init__(self, north, east, z):
         self.north = north
