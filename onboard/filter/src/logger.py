@@ -1,6 +1,6 @@
 import csv
 import json
-# import os
+import os
 from os import getenv
 import time
 
@@ -22,7 +22,7 @@ class Logger:
         # Create files and write headers
 
         # path_self = os.path.abspath(os.path.dirname(__file__))
-        # self.file_path = os.path.join(path_self, 'logs/')
+        self.file_path = os.path.join(os.getcwd(), "onboard", "filter", "logs")
 
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
                     'speed'], 'gps')
@@ -54,8 +54,8 @@ class Logger:
 
     def write(self, contents, type):
         # Writes contents to the log specified by type
-        # with open(self.file_path + type + 'Log.csv',
-        with open(type + 'Log.csv', mode=self.logConfig['mode']) as log:
+        with open(self.file_path + type + 'Log.csv',
+        #with open(type + 'Log.csv', mode=self.logConfig['mode']) as log:
             writer = csv.writer(log)
             writer.writerow(contents)
 
