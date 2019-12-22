@@ -26,6 +26,7 @@ class Plotter:
 
         mean_lat = numpy.mean(lat)
 
+        # Convert to meters
         for i in range(len(long)):
             long[i] = long[i] * (math.pi/180) * 6371000 * math.cos((math.pi/180)*mean_lat)
             lat[i] = lat[i] * (math.pi/180) * 6371000

@@ -28,16 +28,20 @@ class LinearKalman:
     # update(z) (R, H are optionally specified,
     #            we're using the initial matrices every time)
     # measurement vector = z
-
+    # --------------------------------
+    # Q_discrete_white_noise interface
+    # --------------------------------
+    # Q_discrete_white_noise(dim, dt, var, block_size)
+    # number of derivatives in state = dim
+    # time step = dt
+    # variance = var
+    # number of dimensions in state = block_size
 
     def __init__(self, x_initial, P_initial, Q, R, dt):
-        # Builds the Kalman Filter
-        self.kf = KalmanFilter(dim_x=4, dim_z=2, dim_u=2)
-        self.kf.x = np.array(x_inital)
-        if np.isscalar(P_initial):
-            self.kf.P *= P_initial
-        else:
-            self.kf.P[:] = P_inital
+        # Construct the Kalman Filter
+        self.kf = KalmanFilter(dim_x=4, dim_z=4, dim_u=2)
+        self.kf.x = np.array(x_initial)
+        self.kf.P[:] = np.diag(P_initial)
         self.kf.F = np.array([[1., dt, 0., 0.],
                              [0., 1., 0., 0.],
                              [0., 0., 1., dt],
@@ -46,10 +50,9 @@ class LinearKalman:
                              [dt, 0.],
                              [0., 0.5*dt**2.],
                              [0., dt]])
-        self.kf.H = np.array([[1., 0., 0., 0.],
-                              [0., 0., 1., 0.]])
+        self.kf.H = np.eye(4)
         if np.isscalar(Q):
-            self.kf.Q = Q_discrete_white_noise(dim=4, dt=dt, var=Q)
+            self.kf.Q = Q_discrete_white_noise(dim=2, dt=dt, var=Q, block_size=2)
         else:
             self.kf.Q[:] = Q
         self.kf.R *= R
@@ -57,7 +60,7 @@ class LinearKalman:
     def run(self, u, z):
         # Predicts forward using control u and updates with measurement z
         # Returns new state
-        self.kf.predict(u)
-        self.kf.update(z)
+        self.kf.predict(np.array(u))
+        self.kf.update(np.array(z))
 
         return self.kf.x
