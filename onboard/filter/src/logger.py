@@ -37,7 +37,6 @@ class Logger:
                     'speed'], 'odom')
 
         # Subscribe to LCM channels
-        # Modify to accept new sensors
         self.lcm = aiolcm.AsyncLCM()
         self.lcm.subscribe("/gps", self.gps_callback)
         self.lcm.subscribe("/imu", self.imu_callback)
@@ -54,8 +53,8 @@ class Logger:
 
     def write(self, contents, type):
         # Writes contents to the log specified by type
-        with open(self.file_path + type + 'Log.csv',
-        #with open(type + 'Log.csv', mode=self.logConfig['mode']) as log:
+        # with open(self.file_path + type + 'Log.csv', 'w') as log:
+        with open(type + 'Log.csv', mode=self.logConfig['mode']) as log:
             writer = csv.writer(log)
             writer.writerow(contents)
 

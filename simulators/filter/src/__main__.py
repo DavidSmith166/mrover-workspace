@@ -1,101 +1,131 @@
 from rover_common import aiolcm
 from rover_msgs import IMU, GPS
-import csv
-import os
 import time
 import math
-import json
-from .pathGenerator import PathGenerator
+import numpy.random
 
 
 class Simulator:
+    # TODO add state generation based on acceleration
 
     def __init__(self):
-        # Fetch constants
-        config_path = os.getenv('MROVER_CONFIG')
-        config_path += "/config_filter/simConfig.json"
-        with open(config_path, "r") as configJson:
-            config = json.load(configJson)
-            self.GPS_UPDATE_RATE_MILLIS = config['gps_update_rate_millis']
-            self.IMU_UPDATE_RATE_MILLIS = config['imu_update_rate_millis']
-            self.DT_MILLIS = config['dt_s'] * 1000
-            self.SEND_RATE_MILLIS = config['send_rate_millis']
-            self.CSV_MODE = config['csv_mode']
-            self.NEW_PATH = config['new_path']
-        self.GPS_DTS = int(self.GPS_UPDATE_RATE_MILLIS / self.DT_MILLIS)
-        self.IMU_DTS = int(self.IMU_UPDATE_RATE_MILLIS / self.DT_MILLIS)
-
-        self.path_generator = PathGenerator()
-        path_out = self.path_generator.run(self.NEW_PATH)
-        self.truth = path_out['truth']
-        self.noisy = path_out['noisy']
-
         self.lcm = aiolcm.AsyncLCM()
 
-        self.millis = time.time() * 1000
-        self.timesteps = 0
+        self.gps_millis = time.time() * 1000
+        # self.phone_millis = time.time() * 1000
+        self.imu_millis = time.time() * 1000
+        # self.nav_status_millis = time.time() * 1000
 
-    def recordTruth(self):
-        with open(os.path.join('onboard', 'filter', 'logs', 'truthLog.csv'), mode=self.CSV_MODE)\
-                as log:
-            writer = csv.writer(log)
-            writer.writerow(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing', 'speed'])
-            for i in range(len(self.truth['gps_north'])):
-                lat_min, lat_deg = math.modf(self.truth['gps_north'][i])
-                lat_min *= 60
-                long_min, long_deg = math.modf(self.truth['gps_west'][i])
-                long_min *= 60
-                bearing = self.truth['bearing'][i]
-                speed = self.truth['vel_total'][i]
-                writer.writerow([lat_deg, lat_min, long_deg, long_min, bearing, speed])
+        # TODO throw in a config file
+        self.gps_deg_stdev_meters = 200
+        self.gps_vel_stdev_meters = 50
+        self.gps_bearing_stdev = 15
+        self.gps_update_rate = 0.05
+        self.imu_accel_stdev = 0.8
+        self.imu_bearing_stdev = 4
+        self.imu_update_rate = 0.01
 
-    def sendTimestep(self):
-        # send at update rate
-        if (time.time() * 1000 - self.millis) < self.SEND_RATE_MILLIS:
+        self.accel_north = 0
+        self.accel_east = 0
+        self.accel_z = 0
+        self.vel_north = 0
+        self.vel_east = 0
+        self.lat_deg = 0
+        self.long_deg = 0
+        self.bearing = 0
+        self.pitch = 0
+
+    def sendGps(self):
+        # Simulate sensor update rate
+        if (time.time()*1000 - self.gps_millis) < self.gps_update_rate:
+            return
+
+        gps = GPS()
+
+        noisy_lat = numpy.random.normal(self.lat_deg,
+                                        meters2lat(self.gps_deg_stdev_meters))
+        gps.latitude_min, gps.latitude_deg = math.modf(noisy_lat)
+        gps.latitude_deg = int(gps.latitude_deg)
+        gps.latitude_min *= 60
+
+        noisy_long = numpy.random.normal(self.long_deg,
+                                         meters2long(self.gps_deg_stdev_meters,
+                                                     self.lat_deg))
+        gps.longitude_min, gps.longitude_deg = math.modf(noisy_long)
+        gps.longitude_deg = int(gps.longitude_deg)
+        gps.longitude_min *= 60
+
+        gps.bearing_deg = numpy.random.normal(self.bearing,
+                                              self.gps_bearing_stdev)
+        # abs value speed?
+        gps.speed = numpy.random.normal(pythagorean(self.vel_north,
+                                                    self.vel_east),
+                                        self.gps_vel_stdev_meters)
+
+        self.lcm.publish('/gps', gps.encode())
+        self.gps_millis = time.time()*1000
+
+    def sendImu(self):
+        # Simulate sensor update rate
+        if (time.time()*1000 - self.imu_millis) < self.imu_update_rate:
             return
 
         imu = IMU()
-        gps = GPS()
 
-        imu.accel_x = self.noisy['accel_x'][self.timesteps]
-        imu.accel_y = self.noisy['accel_y'][self.timesteps]
-        imu.accel_z = self.noisy['accel_z'][self.timesteps]
+        imu.accel_x = numpy.random.normal(accelAbs2x(self.bearing, self.pitch,
+                                                     self.accel_north,
+                                                     self.accel_east,
+                                                     self.accel_z),
+                                          self.imu_accel_stdev)
+        imu.accel_y = numpy.random.normal(0, self.imu_accel_stdev)
+        imu.accel_z = numpy.random.normal(0, self.imu_accel_stdev)
         imu.gyro_x = imu.gyro_y = imu.gyro_z = imu.mag_x = imu.mag_y = \
             imu.mag_z = 0
-        imu.bearing = self.noisy['bearing'][self.timesteps]
-        imu.pitch = self.noisy['pitch'][self.timesteps]
+        imu.bearing = numpy.random.normal(self.bearing, self.imu_bearing_stdev)
 
-        gps.latitude_min, gps.latitude_deg = math.modf(self.noisy['gps_north'][self.timesteps])
-        gps.latitude_deg = int(gps.latitude_deg)
-        gps.latitude_min *= 60
-        gps.longitude_min, gps.longitude_deg = math.modf(self.noisy['gps_west'][self.timesteps])
-        gps.longitude_deg = int(gps.longitude_deg)
-        gps.longitude_min *= 60
-        gps.bearing_deg = self.noisy['bearing'][self.timesteps]
-        gps.speed = self.noisy['vel_total'][self.timesteps]
+        self.lcm.publish('/imu', imu.encode())
+        self.imu_millis = time.time()*1000
 
-        if self.timesteps % self.GPS_DTS == 0:
-            self.lcm.publish('/gps', gps.encode())
-            # print('Sending GPS')
+    # TODO trash program design, just wanted to get something running
+    def simStatic(self):
+        self.lat_deg = 42.27700000
+        self.long_deg = 83.73820000
 
-        if self.timesteps % self.IMU_DTS == 0:
-            self.lcm.publish('/imu', imu.encode())
-            # print(self.timesteps / self.IMU_DTS)
-            # print('Sending IMU')
+        while True:
+            self.sendGps()
+            self.sendImu()
 
-        self.millis = time.time() * 1000
-        self.timesteps += 1
 
-    def run(self):
-        while self.timesteps < len(self.noisy['gps_north']):
-            self.sendTimestep()
+def meters2lat(meters):
+    return (meters * 180) / (math.pi * 6371000)
+
+
+def meters2long(meters, lat):
+    return meters2lat(meters) / math.cos((math.pi/180) * lat)
+
+
+def pythagorean(a, b):
+    return math.sqrt(a*a + b*b)
+
+
+# returns the x acceleration from absolute accelerations
+def accelAbs2x(bearing, pitch, north, east, z):
+    # TODO check degrees or radians for bearing/pitch
+    # account for divide by 0
+    # cos(pitch) != 0
+    if pitch % 180 != 0:
+        return z / math.sin(pitch)
+    # sin(90 - bearing) != 0
+    elif (90 - bearing) % 180 != 0:
+        return north / (math.cos(pitch) * math.sin(90 - bearing))
+    else:
+        return east / (math.cos(pitch) * math.cos(90 - bearing))
 
 
 # for the dumbass linter
 def main():
     sim = Simulator()
-    sim.recordTruth()
-    sim.run()
+    sim.simStatic()
 
 
 if __name__ == '__main__':

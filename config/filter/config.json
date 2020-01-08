@@ -1,11 +1,15 @@
 {
-    "Q": 0,
+    "Q": 0.1,
 
     "FilterType": "LinearKalman",
 
     "P_initial": [0, 0, 0, 0],
 
-    "TODO": "R Sensor variances, Q",
+    "COMMENT": "R variances in degrees not meters!!!",
 
-    "dt" : 0.01
+    "R": [0.0017986432, 0.00004966803, 0.0024309235, 0.0006077308741],
+
+    "dt" : 0.01,
+
+    "UpdateRate" : 0.1
 }

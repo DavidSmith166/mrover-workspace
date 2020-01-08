@@ -1,11 +1,11 @@
 {
     "rate_millis":
     {
-        "gps": 5000,
+        "gps": 1000,
         "phone": 5000,
-        "imu": 5000,
+        "imu": 1000,
         "nav_status": 5000,
-        "odom": 5000
+        "odom": 1000
     },
 
     "mode": "a"

@@ -1,4 +1,5 @@
 import numpy as np
+import math
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
@@ -42,6 +43,7 @@ class LinearKalman:
         self.kf = KalmanFilter(dim_x=4, dim_z=4, dim_u=2)
         self.kf.x = np.array(x_initial)
         self.kf.P[:] = np.diag(P_initial)
+        self.kf.R[:] = np.diag(R)
         self.kf.F = np.array([[1., dt, 0., 0.],
                              [0., 1., 0., 0.],
                              [0., 0., 1., dt],
@@ -50,12 +52,16 @@ class LinearKalman:
                              [dt, 0.],
                              [0., 0.5*dt**2.],
                              [0., dt]])
-        self.kf.H = np.eye(4)
+        lat_conv = 180 / (math.pi * 6371000)
+        # TODO improve? currently using initial lat as reference
+        long_conv = lat_conv / math.cos((math.pi/180) * x_initial[0])
+        self.kf.H = np.diag([1, lat_conv, 1, long_conv])
         if np.isscalar(Q):
-            self.kf.Q = Q_discrete_white_noise(dim=2, dt=dt, var=Q, block_size=2)
+            self.kf.Q = Q_discrete_white_noise(dim=2, dt=dt, var=Q,
+                                               block_size=2)
         else:
-            self.kf.Q[:] = Q
-        self.kf.R *= R
+            self.kf.Q[:] = np.diag(Q)
+        # self.kf.R *= R
 
     def run(self, u, z):
         # Predicts forward using control u and updates with measurement z

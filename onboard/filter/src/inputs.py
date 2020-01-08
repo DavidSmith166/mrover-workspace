@@ -16,6 +16,10 @@ class RawAccelSensor(ABC):
         self.accel_y = new_accel_sensor.accel_y
         self.accel_z = new_accel_sensor.accel_z
 
+    def ready(self):
+        return self.accel_x is not None and self.accel_y is not None and \
+            self.accel_z is not None
+
     # Converts acceleration to absolute components
     def absolutifyAccel(self, bearing, pitch):
         if self.accel_x is None or bearing is None or pitch is None:
@@ -34,7 +38,11 @@ class RawVelSensor(ABC):
         self.vel_raw = None
 
     def update(self, new_vel_sensor):
-        self.vel_raw = new_vel_sensor.speed
+        if new_vel_sensor.speed >= 0:
+            self.vel_raw = new_vel_sensor.speed
+
+    def ready(self):
+        return self.vel_raw is not None
 
     # Separates vel_raw into absolute components
     def absolutifyVel(self, bearing):
@@ -65,9 +73,13 @@ class RawPosSensor(ABC):
         self.long_deg = new_pos_sensor.longitude_deg
         self.long_min = new_pos_sensor.longitude_min
 
+    def ready(self):
+        return self.lat_deg is not None and self.lat_min is not None and \
+            self.long_deg is not None and self.long_min is not None
+
     def asDecimal(self):
         return PositionDegs(self.lat_deg + self.lat_min / 60,
-                            self.long_deg + long_min / 60)
+                            self.long_deg + self.long_min / 60)
 
 
 class RawBearingSensor(ABC):
@@ -75,6 +87,9 @@ class RawBearingSensor(ABC):
 
     def __init__(self):
         self.bearing = None
+
+    def ready(self):
+        return self.bearing is not None
 
     def update(self, new_bearing_sensor):
         # Account for non-standardized LCM structs >:(
@@ -111,9 +126,24 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
         self.mag_x = new_imu.mag_x
         self.mag_y = new_imu.mag_y
         self.mag_z = new_imu.mag_z
-        self.roll = new_imu.roll
-        self.pitch = new_imu.pitch
-        self.yaw = new_imu.yaw
+        # TODO eli should be calcuating these,
+        # still need to be incorporated into lcm
+        # TODO check for degrees or radians
+        # self.roll = new_imu.roll
+        # self.pitch = new_imu.pitch
+        # self.yaw = new_imu.yaw
+
+        # garbo code, should be temporary since eli is doing these
+        accel_yz = math.sqrt(math.pow(self.accel_y, 2) +
+                             math.pow(self.accel_z, 2))
+        self.pitch = 180 * math.atan2(self.accel_x, accel_yz) / math.pi
+
+        # TODO add roll and yaw
+        self.valid = RawAccelSensor.ready(self) and \
+            RawBearingSensor.ready(self) and self.gyro_x is not None and \
+            self.gyro_y is not None and self.gyro_z is not None and \
+            self.mag_x is not None and self.mag_y is not None and \
+            self.mag_z is not None and self.pitch is not None
 
 
 class RawEncoder(RawVelSensor):
@@ -144,6 +174,9 @@ class RawGPS(RawVelSensor, RawPosSensor, RawBearingSensor):
         RawPosSensor.update(self, new_gps)
         RawBearingSensor.update(self, new_gps)
 
+        self.valid = RawVelSensor.ready(self) and RawPosSensor.ready(self) \
+            and RawBearingSensor.ready(self)
+
 
 class RawPhone(RawPosSensor, RawBearingSensor):
     # Class for burner phone data
@@ -157,6 +190,8 @@ class RawPhone(RawPosSensor, RawBearingSensor):
         # Updates the phone with new LCM data
         RawPosSensor.update(self, new_phone)
         RawBearingSensor.update(self, new_phone)
+
+        self.valid = RawPosSensor.ready(self) and RawAccelSensor.ready(self)
 
 
 class Acceleration:
