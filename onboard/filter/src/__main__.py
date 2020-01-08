@@ -16,6 +16,9 @@ from .linearKalman import LinearKalman
 # TODO critical: confirm meters->degree math works out at all stages,
 # change velocity and acceleration east to west
 
+# Testing simulator
+import simulator
+
 
 class StateEstimate:
     # Abstract class for the current state estimate
