@@ -17,7 +17,9 @@ from .linearKalman import LinearKalman
 # change velocity and acceleration east to west
 
 # Testing simulator
-import simulator
+from . import simulator
+
+path_generator = simulator.path_gen()
 
 
 class StateEstimate:
