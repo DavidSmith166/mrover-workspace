@@ -13,6 +13,8 @@ from .inputs import RawGPS, RawPhone, RawIMU, Velocity2D, \
 from .logger import Logger
 from .linearKalman import LinearKalman
 # don't have nav status in here yet
+# TODO critical: confirm meters->degree math works out at all stages,
+# change velocity and acceleration east to west
 
 
 class StateEstimate:
