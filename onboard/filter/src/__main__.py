@@ -13,13 +13,7 @@ from .inputs import RawGPS, RawPhone, RawIMU, Velocity2D, \
 from .logger import Logger
 from .linearKalman import LinearKalman
 # don't have nav status in here yet
-# TODO critical: confirm meters->degree math works out at all stages,
-# change velocity and acceleration east to west
-
-# Testing simulator
-from . import simulator
-
-path_generator = simulator.path_gen()
+# TODO critical: confirm meters->degree math works out at all stages
 
 
 class StateEstimate:
@@ -27,15 +21,15 @@ class StateEstimate:
     # TODO Need to go through and do better error handling
 
     def __init__(self, lat_deg=None, vel_north=None, long_deg=None,
-                 vel_east=None, bearing=None):
+                 vel_west=None, bearing=None):
         self.pos = PositionDegs(lat_deg, long_deg)
-        self.vel = Velocity2D(vel_north, vel_east)
+        self.vel = Velocity2D(vel_north, vel_west)
         self.bearing = bearing
 
     def asFilterInput(self):
         # Returns the state estimate as a list for filter input
         return [self.pos.lat_deg, meters2lat(self.vel.north),
-                self.pos.long_deg, meters2long(self.vel.east,
+                self.pos.long_deg, meters2long(self.vel.west,
                                                self.pos.lat_deg)]
 
     def updateFromNumpy(self, numpy_array, bearing):
@@ -43,7 +37,7 @@ class StateEstimate:
         self.pos.lat_deg = numpy_array[0]
         self.pos.long_deg = numpy_array[2]
         self.vel.north = lat2meters(numpy_array[1])
-        self.vel.east = long2meters(numpy_array[3], numpy_array[1])
+        self.vel.west = long2meters(numpy_array[3], numpy_array[1])
         self.bearing = bearing
 
     def asOdom(self):
@@ -65,7 +59,7 @@ class SensorFusion:
     # TODO: rename to MemeTeam
 
     def __init__(self):
-        # Read in options from logConfig
+        # Read in options from config
         config_path = getenv('MROVER_CONFIG')
         config_path += "/config_filter/config.json"
         with open(config_path, "r") as config:
@@ -106,10 +100,10 @@ class SensorFusion:
             if accel is None:
                 return
 
-            u = [meters2lat(accel.north), meters2long(accel.east, pos.lat_deg)]
+            u = [meters2lat(accel.north), meters2long(accel.west, pos.lat_deg)]
             vel = self.gps.absolutifyVel(self.imu.bearing)
             z = [pos.lat_deg, meters2lat(vel.north), pos.long_deg,
-                 meters2long(vel.east, pos.lat_deg)]
+                 meters2long(vel.west, pos.lat_deg)]
             x = self.filter.run(u, z)
             self.state_estimate.updateFromNumpy(x, self.imu.bearing)
         elif self.sensorsValid():
@@ -118,7 +112,7 @@ class SensorFusion:
             vel = self.gps.absolutifyVel(self.imu.bearing)
 
             self.state_estimate = StateEstimate(pos.lat_deg, vel.north,
-                                                pos.long_deg, vel.east,
+                                                pos.long_deg, vel.west,
                                                 self.imu.bearing)
             self.constructFilter()
 

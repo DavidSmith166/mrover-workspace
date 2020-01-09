@@ -16,6 +16,7 @@ Stretch Goal is plot noisy, filtered, and true paths and calculate deviation of
 filtered path from truth
 '''
 
+# TODO change parameters to true parameters, throw in config?
 MAXIMUM_JERK = .5
 MAXIMUM_ACCEL = 5
 MINIMUM_ACCEL = -5
@@ -25,6 +26,7 @@ END_TIME = 5
 MAX_POINTS = np.int_(END_TIME / DELTA_TIME)
 NOISE_SCALE = 0.5
 
+# TODO make noise scale stdevs
 
 def point_gen():
     last_point = random.randint(MINIMUM_ACCEL, MAXIMUM_ACCEL)
@@ -33,6 +35,7 @@ def point_gen():
     while num_points < MAX_POINTS:
         new_point = random.uniform(max(last_point - MAXIMUM_JERK, MINIMUM_ACCEL),
                                    min(last_point + MAXIMUM_JERK, MAXIMUM_ACCEL))
+        num_points += 1
         last_point = new_point
         yield np.float64(new_point)
 
