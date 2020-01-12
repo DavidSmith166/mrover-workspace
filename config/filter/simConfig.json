@@ -6,11 +6,16 @@
 
     "imu_accel_stdev_meters" : 0.8,
     "imu_bearing_stdev_degs" : 4,
+    "imu_pitch_stdev_degs" : 0.57,
     "imu_update_rate_s" : 0.01,
 
     "max_jerk" : "placeholder",
     "max_accel" : "placeholder",
     "min_accel" : "placeholder",
+    "max_rot_vel_rads" : 2.5,
+    "max_pitch_vel_rads" : "placeholder",
     "dt" : 0.01,
-    "end_time" : "placeholder"
+    "end_time" : "placeholder",
+
+    "csv_mode" : "a"
 }

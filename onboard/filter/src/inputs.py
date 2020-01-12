@@ -131,13 +131,13 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
         # still need to be incorporated into lcm
         # TODO check for degrees or radians
         # self.roll = new_imu.roll
-        # self.pitch = new_imu.pitch
+        self.pitch = new_imu.pitch
         # self.yaw = new_imu.yaw
 
         # garbo code, should be temporary since eli is doing these
-        accel_yz = math.sqrt(math.pow(self.accel_y, 2) +
-                             math.pow(self.accel_z, 2))
-        self.pitch = 180 * math.atan2(self.accel_x, accel_yz) / math.pi
+        # accel_yz = math.sqrt(math.pow(self.accel_y, 2) +
+        #                      math.pow(self.accel_z, 2))
+        # self.pitch = 180 * math.atan2(self.accel_x, accel_yz) / math.pi
 
         # TODO add roll and yaw
         self.valid = RawAccelSensor.ready(self) and \
