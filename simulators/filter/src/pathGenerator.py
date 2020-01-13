@@ -101,6 +101,8 @@ class PathGenerator:
             gps_points_west = scipy.integrate.cumtrapz(vel_points_west, dx=self.DT_S)
             gps_points_west = [meters2long(gps_points_west[i], gps_points_west[i])
                                for i in range(len(gps_points_west))]
+            gps_points_north = [i + 42.277 for i in gps_points_north]
+            gps_points_west = [i + 83.7382 for i in gps_points_west]
 
             truth = {
                 "accel_x": accel_points_x,
@@ -121,11 +123,13 @@ class PathGenerator:
 
             noisy_vel_points_total = np.random.normal(vel_points_total, self.GPS_VEL_STDEV_METERS)
 
-            noisy_gps_points_north = np.random.normal(gps_points_north,
-                                                      meters2lat(self.GPS_POS_STDEV_METERS))
-            noisy_gps_points_west = np.random.normal(gps_points_west, [abs(i) for i in
-                                                                       meters2long(self.GPS_POS_STDEV_METERS,
-                                                                                   gps_points_north)])
+            # noisy_gps_points_north = np.random.normal(gps_points_north,
+            #                                           meters2lat(self.GPS_POS_STDEV_METERS))
+            noisy_gps_points_north = np.random.normal(gps_points_north, 0.00002)
+            # noisy_gps_points_west = np.random.normal(gps_points_west, [abs(i) for i in
+            #                                                            meters2long(self.GPS_POS_STDEV_METERS,
+            #                                                                        gps_points_north)])
+            noisy_gps_points_west = np.random.normal(gps_points_west, 0.00002)
 
             noisy_bearing_angles_rads = np.random.normal(bearing_angles_rads, deg2rad(self.IMU_BEARING_STDEV_DEGS))
             noisy_pitch_angles_rads = np.random.normal(pitch_angles_rads, deg2rad(self.IMU_PITCH_STDEV_DEGS))

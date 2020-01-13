@@ -39,7 +39,9 @@ class Simulator:
             writer.writerow(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing', 'speed'])
             for i in range(len(self.truth['gps_north'])):
                 lat_min, lat_deg = math.modf(self.truth['gps_north'][i])
+                lat_min *= 60
                 long_min, long_deg = math.modf(self.truth['gps_west'][i])
+                long_min *= 60
                 bearing = self.truth['bearing'][i]
                 speed = self.truth['vel_total'][i]
                 writer.writerow([lat_deg, lat_min, long_deg, long_min, bearing, speed])
