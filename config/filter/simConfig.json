@@ -2,19 +2,19 @@
     "gps_pos_stdev_meters" : 3,
     "gps_vel_stdev_meters" : 0.8,
     "gps_bearing_stdev_degs" : 10,
-    "gps_update_rate_s" : 0.05,
+    "gps_update_rate_millis" : 50,
 
     "imu_accel_stdev_meters" : 0.8,
-    "imu_bearing_stdev_degs" : 4,
-    "imu_pitch_stdev_degs" : 0.57,
-    "imu_update_rate_s" : 0.01,
+    "imu_bearing_stdev_degs" : 0.5,
+    "imu_pitch_stdev_degs" : 0.5,
+    "imu_update_rate_millis" : 10,
 
     "max_jerk" : "placeholder",
     "max_accel" : "placeholder",
     "min_accel" : "placeholder",
     "max_rot_vel_rads" : 2.5,
     "max_pitch_vel_rads" : "placeholder",
-    "dt" : 0.01,
+    "dt_s" : 0.01,
     "end_time" : "placeholder",
 
     "csv_mode" : "a"

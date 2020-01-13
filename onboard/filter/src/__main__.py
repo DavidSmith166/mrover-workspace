@@ -49,7 +49,7 @@ class StateEstimate:
         odom.longitude_min, odom.longitude_deg = math.modf(self.pos.long_deg)
         odom.longitude_deg = int(odom.longitude_deg)
         odom.longitude_min *= 60
-        odom.bearing_deg = self.bearing
+        odom.bearing_deg = self.bearing * math.pi / 180
         odom.speed = self.vel.pythagorean()
         return odom
 

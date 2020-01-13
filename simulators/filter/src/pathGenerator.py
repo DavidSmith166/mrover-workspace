@@ -30,19 +30,17 @@ class PathGenerator:
             self.GPS_POS_STDEV_METERS = config['gps_pos_stdev_meters']
             self.GPS_VEL_STDEV_METERS = config['gps_vel_stdev_meters']
             self.GPS_BEARING_STDEV_DEGS = config['gps_bearing_stdev_degs']
-            self.GPS_UPDATE_RATE_S = config['gps_update_rate_s']
             self.IMU_ACCEL_STDEV_METERS = config['imu_accel_stdev_meters']
             self.IMU_BEARING_STDEV_DEGS = config['imu_bearing_stdev_degs']
             self.IMU_PITCH_STDEV_DEGS = config['imu_bearing_stdev_degs']
-            self.IMU_UPDATE_RATE_S = config['imu_update_rate_s']
             self.MAX_JERK = config['max_jerk']
             self.MAX_ACCEL = config['max_accel']
             self.MIN_ACCEL = config['min_accel']
             self.MAX_ROT_VEL_RADS = config['max_rot_vel_rads']
             self.MAX_PITCH_VEL_RADS = config['max_pitch_vel_rads']
-            self.DT = config['dt']
+            self.DT_S = config['dt_s']
             self.END_TIME = config['end_time']
-        self.MAX_READINGS = np.int_(self.END_TIME / self.DT)
+        self.MAX_READINGS = np.int_(self.END_TIME / self.DT_S)
 
     # generates accelerations in m/s2
     def point_gen(self):
@@ -90,13 +88,13 @@ class PathGenerator:
             accel_points_west =np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_cos))
 
             # generate derivatives
-            vel_points_north = np.trapz(accel_points_north, dx=self.DT)
-            vel_points_west = np.trapz(accel_points_west, dx=self.DT)
+            vel_points_north = np.trapz(accel_points_north, dx=self.DT_S)
+            vel_points_west = np.trapz(accel_points_west, dx=self.DT_S)
             vel_points_total = np.array([math.sqrt(vel_points_north[i]**2 + vel_points_west[i]**2)
                                          for i in range(len(vel_points_north))])
 
-            gps_points_north = np.trapz(vel_points_north, dx=self.DT)
-            gps_points_west = np.trapz(vel_points_west, dx=self.DT)
+            gps_points_north = np.trapz(vel_points_north, dx=self.DT_S)
+            gps_points_west = np.trapz(vel_points_west, dx=self.DT_S)
 
             truth = {
                 "accel_x" : accel_points_x,
