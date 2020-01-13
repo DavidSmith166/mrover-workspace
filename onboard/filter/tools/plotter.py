@@ -18,6 +18,7 @@ def meters2long(meters, lat):
     return meters2lat(meters) / math.cos((math.pi/180) * lat)
 
 class Plotter:
+    # def need to clean this shit up
 
     def readCsv(self, type):
         # Reads in the CSV file specified by log
@@ -102,6 +103,14 @@ class Plotter:
         plot.xlabel('Time (seconds)')
         plot.ylabel('Bearing (degrees)')
         plot.title('Bearing')
+    
+    def plotPath(self, color):
+        # Convert DMS to decimal
+        long = self.data['long_deg'] + self.data['long_min']/60
+        lat = self.data['lat_deg'] + self.data['lat_min']/60
+
+        plot.scatter(long, lat, color=color)
+
 
     def plot(self, data_type):
         # Decides what to plot
@@ -129,6 +138,14 @@ class Plotter:
             self.plotCoords([1, 2, 1])
             self.plotSpeed([2, 2, 2])
             self.plotBearing([2, 2, 4])
+        elif data_type == 'gpsComp':
+            self.readCsv('gps')
+            self.plotPath('red')
+            self.readCsv('truth')
+            self.plotPath('black')
+            self.readCsv('odom')
+            self.plotPath('blue')
+            # TODO add legend
         else:
             print('Invalid data type.')
             sys.exit()

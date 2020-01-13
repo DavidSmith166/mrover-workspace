@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.integrate
 import json
 from os import getenv
 import random
@@ -18,6 +19,7 @@ Result is a correct path and a noisy path to filter.
 Stretch Goal is plot noisy, filtered, and true paths and calculate deviation of
 filtered path from truth
 '''
+
 
 class PathGenerator:
 
@@ -44,40 +46,41 @@ class PathGenerator:
 
     # generates accelerations in m/s2
     def point_gen(self):
-        last_point = random.randint(self.MIN_ACCEL, self.MAX_ACCEL)
+        last_point = random.uniform(self.MIN_ACCEL, self.MAX_ACCEL)
         num_points = 1
         yield np.float64(last_point)
         while num_points < self.MAX_READINGS:
-            new_point = random.uniform(max(last_point - self.MAX_JERK, self.MIN_ACCEL),
-                                    min(last_point + self.MAX_JERK, self.MAX_ACCEL))
+            # new_point = random.uniform(max(last_point - self.MAX_JERK, self.MIN_ACCEL),
+            #                            min(last_point + self.MAX_JERK, self.MAX_ACCEL))
+            new_point = np.random.uniform(max(last_point - 0.2*self.MAX_JERK, self.MIN_ACCEL),
+                                          min(last_point + self.MAX_JERK, self.MAX_ACCEL))
             num_points += 1
             last_point = new_point
             yield np.float64(new_point)
-    
+
     # generates angles in radians
     def angle_gen(self, delta):
-        last_angle = random.randint(0, 2*math.pi)
+        last_angle = random.uniform(0, 2*math.pi)
         num_angles = 1
         yield np.float64(last_angle)
         while num_angles < self.MAX_READINGS:
             new_angle = random.uniform((last_angle - delta) % 2*math.pi,
-                                    (last_angle + delta) % 2*math.pi)
+                                       (last_angle + delta) % 2*math.pi)
             num_angles += 1
             last_angle = new_angle
             yield np.float64(new_angle)
 
     def generator(self):
-
-        '''
-        ### Units are m/s
-        '''
+        # units are m/s
 
         while True:
 
             # generate control inputs
             accel_points_x = np.fromiter(self.point_gen(), np.float64, count=self.MAX_READINGS)
-            bearing_angles_rads = np.fromiter(self.angle_gen(self.MAX_ROT_VEL_RADS), np.float64, count=self.MAX_READINGS)
-            pitch_angles_rads = np.fromiter(self.angle_gen(self.MAX_PITCH_VEL_RADS))
+            bearing_angles_rads = np.fromiter(self.angle_gen(self.MAX_ROT_VEL_RADS), np.float64,
+                                              count=self.MAX_READINGS)
+            pitch_angles_rads = np.fromiter(self.angle_gen(self.MAX_PITCH_VEL_RADS), np.float64,
+                                            count=self.MAX_READINGS)
 
             # generate absolute accelerations
             bearing_sin = [math.sin(deg2rad(90) - i) for i in bearing_angles_rads]
@@ -85,27 +88,30 @@ class PathGenerator:
             pitch_cos = [math.cos(i) for i in pitch_angles_rads]
             # pitch_sin = [math.sin(i) for i in pitch_angles_rads]
             accel_points_north = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_sin))
-            accel_points_west =np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_cos))
+            accel_points_west = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_cos))
 
             # generate derivatives
-            vel_points_north = np.trapz(accel_points_north, dx=self.DT_S)
-            vel_points_west = np.trapz(accel_points_west, dx=self.DT_S)
+            vel_points_north = scipy.integrate.cumtrapz(accel_points_north, dx=self.DT_S)
+            vel_points_west = scipy.integrate.cumtrapz(accel_points_west, dx=self.DT_S)
             vel_points_total = np.array([math.sqrt(vel_points_north[i]**2 + vel_points_west[i]**2)
                                          for i in range(len(vel_points_north))])
 
-            gps_points_north = np.trapz(vel_points_north, dx=self.DT_S)
-            gps_points_west = np.trapz(vel_points_west, dx=self.DT_S)
+            gps_points_north = scipy.integrate.cumtrapz(vel_points_north, dx=self.DT_S)
+            gps_points_north = [meters2lat(i) for i in gps_points_north]
+            gps_points_west = scipy.integrate.cumtrapz(vel_points_west, dx=self.DT_S)
+            gps_points_west = [meters2long(gps_points_west[i], gps_points_west[i])
+                               for i in range(len(gps_points_west))]
 
             truth = {
-                "accel_x" : accel_points_x,
-                "accel_y" : np.zeros(self.MAX_READINGS),
+                "accel_x": accel_points_x,
+                "accel_y": np.zeros(self.MAX_READINGS),
                 "accel_z": np.zeros(self.MAX_READINGS),
                 "vel_north": vel_points_north,
                 "vel_west": vel_points_west,
                 "vel_total": vel_points_total,
                 "gps_north": gps_points_north,
                 "gps_west": gps_points_west,
-                "bearing" : bearing_angles_rads
+                "bearing": bearing_angles_rads
             }
 
             # noise it up
@@ -117,9 +123,10 @@ class PathGenerator:
 
             noisy_gps_points_north = np.random.normal(gps_points_north,
                                                       meters2lat(self.GPS_POS_STDEV_METERS))
-            noisy_gps_points_west = np.random.normal(gps_points_west, meters2long(self.GPS_POS_STDEV_METERS,
-                                                                                  gps_points_north))
-            
+            noisy_gps_points_west = np.random.normal(gps_points_west, [abs(i) for i in
+                                                                       meters2long(self.GPS_POS_STDEV_METERS,
+                                                                                   gps_points_north)])
+
             noisy_bearing_angles_rads = np.random.normal(bearing_angles_rads, deg2rad(self.IMU_BEARING_STDEV_DEGS))
             noisy_pitch_angles_rads = np.random.normal(pitch_angles_rads, deg2rad(self.IMU_PITCH_STDEV_DEGS))
 
@@ -130,9 +137,19 @@ class PathGenerator:
                 "vel_total": noisy_vel_points_total,
                 "gps_north": noisy_gps_points_north,
                 "gps_west": noisy_gps_points_west,
-                "bearing" : noisy_bearing_angles_rads,
-                "pitch" : noisy_pitch_angles_rads
+                "bearing": noisy_bearing_angles_rads,
+                "pitch": noisy_pitch_angles_rads
             }
+
+            delta = [abs(i) for i in gps_points_north - noisy_gps_points_north]
+            print(np.max(delta))
+            print(max(gps_points_north))
+            delta = [abs(i) for i in vel_points_total - noisy_vel_points_total]
+            print(np.max(delta))
+            print(max(vel_points_total))
+            delta = [abs(i) for i in accel_points_x - noisy_accel_points_x]
+            print(np.max(delta))
+            print(max(accel_points_x))
 
             yield {"truth": truth, "noisy": noisy}
 
@@ -149,6 +166,7 @@ def meters2long(meters, lat):
         return meters2lat(meters) / math.cos((math.pi/180) * lat)
     else:
         return [meters2lat(meters) / math.cos((math.pi/180) * i) for i in lat]
+
 
 def deg2rad(degs):
     return degs * math.pi / 180

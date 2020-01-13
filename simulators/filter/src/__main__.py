@@ -5,9 +5,7 @@ from os import getenv
 import time
 import math
 import json
-import numpy.random
 from .pathGenerator import PathGenerator
-# TODO remove noise generation?
 
 
 class Simulator:
@@ -32,14 +30,14 @@ class Simulator:
             self.IMU_UPDATE_RATE_MILLIS = config['imu_update_rate_millis']
             self.DT_MILLIS = config['dt_s'] * 1000
             self.CSV_MODE = config['csv_mode']
-        self.GPS_DTS = self.GPS_UPDATE_RATE_MILLIS / self.DT_MILLIS
-        self.IMU_DTS = self.IMU_UPDATE_RATE_MILLIS / self.DT_MILLIS
+        self.GPS_DTS = int(self.GPS_UPDATE_RATE_MILLIS / self.DT_MILLIS)
+        self.IMU_DTS = int(self.IMU_UPDATE_RATE_MILLIS / self.DT_MILLIS)
 
     def recordTruth(self):
         with open('truthLog.csv', mode=self.CSV_MODE) as log:
             writer = csv.writer(log)
             writer.writerow(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing', 'speed'])
-            for i in len(self.truth['accel_north']):
+            for i in range(len(self.truth['gps_north'])):
                 lat_min, lat_deg = math.modf(self.truth['gps_north'][i])
                 long_min, long_deg = math.modf(self.truth['gps_west'][i])
                 bearing = self.truth['bearing'][i]
@@ -48,9 +46,9 @@ class Simulator:
 
     def sendTimestep(self):
         # send at update rate
-        if time.time() * 1000 - self.millis < self.DT_MILLIS:
+        if (time.time() * 1000 - self.millis) < self.DT_MILLIS:
             return
-        
+
         imu = IMU()
         gps = GPS()
 
@@ -61,7 +59,7 @@ class Simulator:
             imu.mag_z = 0
         imu.bearing = self.noisy['bearing'][self.timesteps]
         imu.pitch = self.noisy['pitch'][self.timesteps]
-        
+
         gps.latitude_min, gps.latitude_deg = math.modf(self.noisy['gps_north'][self.timesteps])
         gps.latitude_deg = int(gps.latitude_deg)
         gps.latitude_min *= 60
@@ -73,15 +71,17 @@ class Simulator:
 
         if self.timesteps % self.GPS_DTS == 0:
             self.lcm.publish('/gps', gps.encode())
-        
+            # print('Sending GPS')
+
         if self.timesteps % self.IMU_DTS == 0:
-            self.lcm.publish('/gps', gps.encode())
-        
+            self.lcm.publish('/imu', imu.encode())
+            # print('Sending IMU')
+
         self.millis = time.time() * 1000
         self.timesteps += 1
 
     def run(self):
-        while self.timesteps < len(self.noisy['accel_x']):
+        while self.timesteps < len(self.noisy['gps_north']):
             self.sendTimestep()
 
     # # Sends noisy GPS data over /gps LCM
@@ -141,6 +141,7 @@ class Simulator:
 # for the dumbass linter
 def main():
     sim = Simulator()
+    sim.recordTruth()
     sim.run()
 
 

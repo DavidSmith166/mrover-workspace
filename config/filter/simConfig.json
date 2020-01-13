@@ -1,21 +1,21 @@
 {
-    "gps_pos_stdev_meters" : 3,
-    "gps_vel_stdev_meters" : 0.8,
+    "gps_pos_stdev_meters" : 2,
+    "gps_vel_stdev_meters" : 0.2,
     "gps_bearing_stdev_degs" : 10,
     "gps_update_rate_millis" : 50,
 
-    "imu_accel_stdev_meters" : 0.8,
+    "imu_accel_stdev_meters" : 0.1,
     "imu_bearing_stdev_degs" : 0.5,
     "imu_pitch_stdev_degs" : 0.5,
     "imu_update_rate_millis" : 10,
 
-    "max_jerk" : "placeholder",
-    "max_accel" : "placeholder",
-    "min_accel" : "placeholder",
+    "max_jerk" : 0.1,
+    "max_accel" : 1.5,
+    "min_accel" : -1.5,
     "max_rot_vel_rads" : 2.5,
-    "max_pitch_vel_rads" : "placeholder",
+    "max_pitch_vel_rads" : 0.5,
     "dt_s" : 0.01,
-    "end_time" : "placeholder",
+    "end_time" : 10,
 
     "csv_mode" : "a"
 }
