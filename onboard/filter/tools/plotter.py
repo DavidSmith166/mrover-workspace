@@ -3,7 +3,7 @@ import os
 import math
 import sys
 import matplotlib.pyplot as plot
-#TODO integrate with simulator
+import statistics
 
 def lat2meters(lat):
     return lat * (math.pi/180) * 6371000
@@ -141,10 +141,60 @@ class Plotter:
         elif data_type == 'gpsComp':
             self.readCsv('gps')
             self.plotPath('red')
+            gps = self.data
             self.readCsv('truth')
             self.plotPath('black')
+            truth = self.data
+            self.readCsv('shit')
+            self.plotPath('green')
+            shit = self.data
             self.readCsv('odom')
             self.plotPath('blue')
+            odom = self.data
+
+            for i in range(len(truth)):
+                truth[i]['lat_deg'] = truth[i]['lat_deg'] + truth[i]['lat_min']/60
+                truth[i]['long_deg'] = truth[i]['long_deg'] + truth[i]['lat_min']/60
+            
+            for i in range(len(gps)):
+                gps[i]['lat_deg'] = gps[i]['lat_deg'] + gps[i]['lat_min']/60
+                gps[i]['long_deg'] = gps[i]['long_deg'] + gps[i]['lat_min']/60
+            
+            for i in range(len(shit)):
+                shit[i]['lat_deg'] = shit[i]['lat_deg'] + shit[i]['lat_min']/60
+                shit[i]['long_deg'] = shit[i]['long_deg'] + shit[i]['lat_min']/60
+            
+            for i in range(len(odom)):
+                odom[i]['lat_deg'] = odom[i]['lat_deg'] + odom[i]['lat_min']/60
+                odom[i]['long_deg'] = odom[i]['long_deg'] + odom[i]['lat_min']/60
+            
+            gps_truth = len(truth) / len(gps)
+            shit_truth = len(truth) / len(shit)
+            odom_truth = len(truth) / len(odom)
+
+            gps_diff = []
+            for i in range(len(gps)):
+                index = int(gps_truth * i)
+                gps_diff.append(gps[i]['lat_deg'] - truth[index]['lat_deg'])
+
+            shit_diff = []
+            for i in range(len(shit)):
+                index = int(shit_truth * i)
+                shit_diff.append(shit[i]['lat_deg'] - truth[index]['lat_deg'])
+
+            odom_diff= []
+            for i in range(len(odom)):
+                index = int(odom_truth * i)
+                odom_diff.append(odom[i]['lat_deg'] - truth[index]['lat_deg'])
+
+            gps_diff = [i**2 for i in gps_diff]
+            shit_diff = [i**2 for i in shit_diff]
+            odom_diff = [i**2 for i in odom_diff]
+
+            print('GPS MQE: ' + str(statistics.mean(gps_diff)))
+            print('Shit MQE: ' + str(statistics.mean(shit_diff)))
+            print('Odom MQE: ' + str(statistics.mean(odom_diff)))
+            
             # TODO add legend
         else:
             print('Invalid data type.')

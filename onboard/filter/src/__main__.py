@@ -81,9 +81,42 @@ class SensorFusion:
         # self.lcm.subscribe("/nav_status", self.nav_statusCallback)
         self.lcm.subscribe("/sensor_package", self.phoneCallback)
 
+        # Temp shitty filter
+        self.gps_readings = []
+
+    def tempShittyFilter(self):
+        if len(self.gps_readings) >= 5:
+            mean_lat = 0
+            mean_long = 0
+            for reading in self.gps_readings:
+                mean_lat += reading.lat_deg
+                mean_long += reading.long_deg
+            mean_lat /= 5
+            mean_long /= 5
+            lat_min, lat_deg = math.modf(mean_lat)
+            lat_deg = int(lat_deg)
+            lat_min *= 60
+            long_min, long_deg = math.modf(mean_long)
+            long_deg = int(long_deg)
+            long_min *= 60
+
+            odom = Odometry()
+            odom.latitude_deg = lat_deg
+            odom.latitude_min = lat_min
+            odom.longitude_deg = long_deg
+            odom.longitude_min = long_min
+            odom.bearing_deg = 0
+            odom.speed = 0
+            self.lcm.publish('/shit', odom.encode())
+
+            self.gps_readings.pop(0)
+
+        self.gps_readings.append(self.gps.asDecimal())
+
     def gpsCallback(self, channel, msg):
         new_gps = GPS.decode(msg)
         self.gps.update(new_gps)
+        self.tempShittyFilter()
 
     def phoneCallback(self, channel, msg):
         new_phone = SensorPackage.decode(msg)
