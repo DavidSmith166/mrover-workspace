@@ -12,6 +12,7 @@ from .inputs import RawGPS, RawPhone, RawIMU, Velocity2D, \
                     PositionDegs
 from .logger import Logger
 from .linearKalman import LinearKalman
+from conversions import meters2lat, meters2long, lat2meters, long2meters
 # don't have nav status in here yet
 # TODO critical: confirm meters->degree math works out at all stages
 
@@ -20,8 +21,8 @@ class StateEstimate:
     # Abstract class for the current state estimate
     # TODO Need to go through and do better error handling
 
-    def __init__(self, lat_deg=None, vel_north=None, long_deg=None,
-                 vel_west=None, bearing=None):
+    def __init__(self, lat_deg=None, lat_min=None, vel_north=None,
+                 long_deg=None, long_min=None, vel_west=None, bearing=None):
         self.pos = PositionDegs(lat_deg, long_deg)
         self.vel = Velocity2D(vel_north, vel_west)
         self.bearing = bearing
@@ -81,10 +82,10 @@ class SensorFusion:
         # self.lcm.subscribe("/nav_status", self.nav_statusCallback)
         self.lcm.subscribe("/sensor_package", self.phoneCallback)
 
-        # Temp shitty filter
+        # Temp mov_avg filter
         self.gps_readings = []
 
-    def tempShittyFilter(self):
+    def movAvg(self):
         if len(self.gps_readings) >= 5:
             mean_lat = 0
             mean_long = 0
@@ -107,7 +108,7 @@ class SensorFusion:
             odom.longitude_min = long_min
             odom.bearing_deg = 0
             odom.speed = 0
-            self.lcm.publish('/shit', odom.encode())
+            self.lcm.publish('/mov_avg', odom.encode())
 
             self.gps_readings.pop(0)
 
@@ -116,7 +117,7 @@ class SensorFusion:
     def gpsCallback(self, channel, msg):
         new_gps = GPS.decode(msg)
         self.gps.update(new_gps)
-        self.tempShittyFilter()
+        self.movAvg()
 
     def phoneCallback(self, channel, msg):
         new_phone = SensorPackage.decode(msg)
@@ -179,7 +180,6 @@ class SensorFusion:
             await asyncio.sleep(self.config["UpdateRate"])
 
 
-# for the dumbass linter
 def main():
     fuser = SensorFusion()
     logger = Logger()
@@ -188,21 +188,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-# conversion functions
-
-def meters2lat(meters):
-    return (meters * 180) / (math.pi * 6371000)
-
-
-def meters2long(meters, lat):
-    return meters2lat(meters) / math.cos((math.pi/180) * lat)
-
-
-def lat2meters(lat):
-    return lat * (math.pi/180) * 6371000
-
-
-def long2meters(long, lat):
-    return lat2meters(long) * math.cos((math.pi / 180) * lat)

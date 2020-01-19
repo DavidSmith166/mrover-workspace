@@ -1,6 +1,5 @@
 import math
 from abc import ABC
-# TODO change valid to functions
 
 
 class RawAccelSensor(ABC):
@@ -79,8 +78,7 @@ class RawPosSensor(ABC):
             self.long_deg is not None and self.long_min is not None
 
     def asDecimal(self):
-        return PositionDegs(self.lat_deg + self.lat_min / 60,
-                            self.long_deg + self.long_min / 60)
+        return PositionDegs(self.lat_deg, self.long_deg, self.lat_min, self.long_min)
 
 
 class RawBearingSensor(ABC):
@@ -115,7 +113,6 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
         self.roll = None
         self.pitch = None
         self.yaw = None
-        self.valid = False
 
     def update(self, new_imu):
         # Updates the IMU with new LCM data
@@ -127,20 +124,13 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
         self.mag_x = new_imu.mag_x
         self.mag_y = new_imu.mag_y
         self.mag_z = new_imu.mag_z
-        # TODO eli should be calcuating these,
-        # still need to be incorporated into lcm
         # TODO check for degrees or radians
-        # self.roll = new_imu.roll
-        self.pitch = new_imu.pitch
-        # self.yaw = new_imu.yaw
-
-        # garbo code, should be temporary since eli is doing these
-        # accel_yz = math.sqrt(math.pow(self.accel_y, 2) +
-        #                      math.pow(self.accel_z, 2))
-        # self.pitch = 180 * math.atan2(self.accel_x, accel_yz) / math.pi
-
         # TODO add roll and yaw
-        self.valid = RawAccelSensor.ready(self) and \
+        self.pitch = new_imu.pitch
+
+    def ready(self):
+        # TODO add roll and yaw
+        return RawAccelSensor.ready(self) and \
             RawBearingSensor.ready(self) and self.gyro_x is not None and \
             self.gyro_y is not None and self.gyro_z is not None and \
             self.mag_x is not None and self.mag_y is not None and \
@@ -149,14 +139,12 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
 
 class RawEncoder(RawVelSensor):
     # Class for wheel encoder data
-    # Should RawEncoder hold data for all four encoders?
 
     def __init__(self):
         RawVelSensor.__init__(self)
 
     def update(self, new_encoder):
         # Updates the encoder with new LCM data
-        # TODO
         pass
 
 
@@ -167,7 +155,6 @@ class RawGPS(RawVelSensor, RawPosSensor, RawBearingSensor):
         RawVelSensor.__init__(self)
         RawPosSensor.__init__(self)
         RawBearingSensor.__init__(self)
-        self.valid = False
 
     def update(self, new_gps):
         # Updates the GPS with new LCM data
@@ -175,7 +162,8 @@ class RawGPS(RawVelSensor, RawPosSensor, RawBearingSensor):
         RawPosSensor.update(self, new_gps)
         RawBearingSensor.update(self, new_gps)
 
-        self.valid = RawVelSensor.ready(self) and RawPosSensor.ready(self) \
+    def ready(self):
+        return RawVelSensor.ready(self) and RawPosSensor.ready(self) \
             and RawBearingSensor.ready(self)
 
 
@@ -185,14 +173,14 @@ class RawPhone(RawPosSensor, RawBearingSensor):
     def __init__(self):
         RawPosSensor.__init__(self)
         RawBearingSensor.__init__(self)
-        self.valid = False
 
     def update(self, new_phone):
         # Updates the phone with new LCM data
         RawPosSensor.update(self, new_phone)
         RawBearingSensor.update(self, new_phone)
 
-        self.valid = RawPosSensor.ready(self) and RawAccelSensor.ready(self)
+    def ready(self):
+        return RawPosSensor.ready(self) and RawAccelSensor.ready(self)
 
 
 class Acceleration:
@@ -215,9 +203,14 @@ class Velocity2D:
 
 class PositionDegs:
     # Class for position in decimal degrees
-    def __init__(self, lat_deg, long_deg):
-        self.lat_deg = lat_deg
-        self.long_deg = long_deg
+    def __init__(self, lat_deg, long_deg, lat_min=0, long_min=0):
+        if lat_deg is None or lat_min is None or \
+            long_deg is None or long_min is None:
+            self.lat_deg = lat_deg
+            self.long_deg = long_deg
+        else:
+            self.lat_deg = lat_deg + lat_min / 60
+            self.long_deg = long_deg + long_min / 60
 
 
 class RawNavStatus:

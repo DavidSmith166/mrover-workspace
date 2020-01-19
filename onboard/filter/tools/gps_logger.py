@@ -1,8 +1,15 @@
 import csv
+import datetime
+
+now = str(datetime.datetime.now())
+dot_loc = now.find('.')
+now = now[:dot_loc]
+now = now.replace(':', '.')
+name = 'newGpsLog' + now + '.csv'
 
 def write(contents):
         # Writes contents to the log
-        with open('altGpsLog.csv', mode='a') as log:
+        with open(name, mode='a') as log:
             writer = csv.writer(log)
             writer.writerow(contents)
 
