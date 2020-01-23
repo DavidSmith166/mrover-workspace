@@ -3,6 +3,7 @@ import numpy as np
 
 # conversion functions
 
+
 def meters2lat(meters):
     if np.isscalar(meters):
         return rad2deg(meters / 6371000)
@@ -55,3 +56,12 @@ def rad2deg(rad):
         return rad * 180 / math.pi
     else:
         return [i * 180 / math.pi for i in rad]
+
+
+def decimal2min(decimal):
+    min, deg = math.modf(decimal)
+    return int(deg), min * 60
+
+
+def min2decimal(deg, min):
+    return deg + min / 60

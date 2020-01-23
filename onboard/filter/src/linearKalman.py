@@ -1,6 +1,6 @@
 import numpy as np
-import math
-from conversions import meters2lat, meters2long
+# import math
+from .conversions import meters2lat, meters2long
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 from scipy.linalg import block_diag
@@ -43,8 +43,8 @@ class LinearKalman:
     def __init__(self, x_initial, P_initial, Q, R, dt):
         # construct the Kalman Filter
         self.kf = KalmanFilter(dim_x=4, dim_z=4, dim_u=2)
+        x_initial = x_initial.asLKFInput()
         self.kf.x = np.array(x_initial)
-
 
         # convert P_initial from meters to degrees
         P_initial[:2] = meters2lat(P_initial[:2])
@@ -78,10 +78,22 @@ class LinearKalman:
                                         block_size=1)
         self.kf.Q = block_diag(Q_lat, Q_long)
 
-    def run(self, u, z):
-        # predicts forward using control u and updates with measurement z
+    def run(self, gps, imu, state_estimate):
+        # predicts forward given sensors
         # returns new state
+        measured_pos = gps.asDecimal()
+        measured_vel = gps.absolutifyVel(imu.bearing)
+        measured_accel = imu.absolutifyAccel(imu.bearing, imu.pitch)
+
+        # create measurement and control vectors
+        u = [meters2lat(measured_accel.north),
+             meters2long(measured_accel.west, measured_pos.lat_deg)]
+
+        z = [measured_pos.lat_deg, meters2lat(measured_vel.north),
+             measured_pos.long_deg,
+             meters2long(measured_vel.west, measured_pos.lat_deg)]
+
         self.kf.predict(np.array(u))
         self.kf.update(np.array(z))
 
-        return self.kf.x
+        state_estimate.updateFromLKF(self.kf.x, imu.bearing)
