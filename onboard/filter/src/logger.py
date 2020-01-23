@@ -36,7 +36,7 @@ class Logger:
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
                     'speed'], 'odom')
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
-                    'speed'], 'mov_avg')
+                    'speed'], 'movAvg')
 
         # Subscribe to LCM channels
         self.lcm = aiolcm.AsyncLCM()
@@ -115,7 +115,7 @@ class Logger:
                 self.logConfig['rate_millis']['odom']:
             self.write([mov_avg.latitude_deg, mov_avg.latitude_min,
                         mov_avg.longitude_deg, mov_avg.longitude_min,
-                        mov_avg.bearing_deg, mov_avg.speed], 'mov_avg')
+                        mov_avg.bearing_deg, mov_avg.speed], 'movAvg')
             self.mov_avg_millis = time.time()*1000
 
 

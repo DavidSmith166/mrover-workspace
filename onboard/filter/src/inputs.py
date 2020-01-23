@@ -1,5 +1,6 @@
 import math
 from abc import ABC
+from .conversions import min2decimal
 
 
 class RawAccelSensor(ABC):
@@ -92,6 +93,7 @@ class RawBearingSensor(ABC):
 
     def update(self, new_bearing_sensor):
         # Account for non-standardized LCM structs >:(
+        # TODO check for degrees vs radians
         if hasattr(new_bearing_sensor, 'bearing'):
             self.bearing = new_bearing_sensor.bearing
         else:
@@ -205,12 +207,12 @@ class PositionDegs:
     # Class for position in decimal degrees
     def __init__(self, lat_deg, long_deg, lat_min=0, long_min=0):
         if lat_deg is None or lat_min is None or \
-            long_deg is None or long_min is None:
+           long_deg is None or long_min is None:
             self.lat_deg = lat_deg
             self.long_deg = long_deg
         else:
-            self.lat_deg = lat_deg + lat_min / 60
-            self.long_deg = long_deg + long_min / 60
+            self.lat_deg = min2decimal(lat_deg, lat_min)
+            self.long_deg = min2decimal(long_deg, long_min)
 
 
 class RawNavStatus:
