@@ -1,6 +1,6 @@
 import csv
 import json
-import os
+# import os
 from os import getenv
 import time
 
@@ -22,7 +22,7 @@ class Logger:
         # Create files and write headers
 
         # path_self = os.path.abspath(os.path.dirname(__file__))
-        self.file_path = os.path.join(os.getcwd(), "onboard", "filter", "logs")
+        # self.file_path = os.path.join(os.getcwd(), "onboard", "filter", "logs")
 
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
                     'speed'], 'gps')
@@ -35,6 +35,8 @@ class Logger:
                     'speed'], 'phone')
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
                     'speed'], 'odom')
+        self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
+                    'speed'], 'movAvg')
 
         # Subscribe to LCM channels
         self.lcm = aiolcm.AsyncLCM()
@@ -43,6 +45,8 @@ class Logger:
         self.lcm.subscribe("/nav_status", self.nav_status_callback)
         self.lcm.subscribe("/sensor_package", self.phone_callback)
         self.lcm.subscribe("/odometry", self.odom_callback)
+        # Temp mov_avg filter
+        self.lcm.subscribe("/mov_avg", self.mov_avg_callback)
 
         # Initialize sensor timestamps
         self.gps_millis = time.time() * 1000
@@ -50,6 +54,8 @@ class Logger:
         self.imu_millis = time.time() * 1000
         self.nav_status_millis = time.time() * 1000
         self.odom_millis = time.time() * 1000
+        # Temp mov_avg filter
+        self.mov_avg_millis = time.time() * 1000
 
     def write(self, contents, type):
         # Writes contents to the log specified by type
@@ -102,6 +108,15 @@ class Logger:
                         odom.longitude_deg, odom.longitude_min,
                         odom.bearing_deg, odom.speed], 'odom')
             self.odom_millis = time.time()*1000
+
+    def mov_avg_callback(self, channel, msg):
+        mov_avg = Odometry.decode(msg)
+        if (time.time()*1000 - self.mov_avg_millis) > \
+                self.logConfig['rate_millis']['odom']:
+            self.write([mov_avg.latitude_deg, mov_avg.latitude_min,
+                        mov_avg.longitude_deg, mov_avg.longitude_min,
+                        mov_avg.bearing_deg, mov_avg.speed], 'movAvg')
+            self.mov_avg_millis = time.time()*1000
 
 
 if __name__ == "__main__":

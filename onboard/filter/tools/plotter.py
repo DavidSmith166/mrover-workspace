@@ -3,7 +3,8 @@ import os
 import math
 import sys
 import matplotlib.pyplot as plot
-#TODO integrate with simulator
+import statistics
+import datetime
 
 def lat2meters(lat):
     return lat * (math.pi/180) * 6371000
@@ -19,6 +20,7 @@ def meters2long(meters, lat):
 
 class Plotter:
     # def need to clean this shit up
+    # TODO add rate limit options
 
     def readCsv(self, type):
         # Reads in the CSV file specified by log
@@ -43,9 +45,11 @@ class Plotter:
         for i in range(len(long)):
             long[i] = long2meters(long[i], mean_lat)
             lat[i] = lat2meters(lat[i])
+        mean_lat = numpy.mean(lat)
+        mean_long = numpy.mean(long)
         # Calculate delta vectors
-        delta_long = long - long2meters(83.7382, 42.277)
-        delta_lat = lat - lat2meters(42.277)
+        delta_long = long - mean_long
+        delta_lat = lat - mean_lat
 
         # Calculate error circles
         sigma_long = numpy.std(delta_long)
@@ -65,9 +69,9 @@ class Plotter:
         _max = max(numpy.amax(delta_long)+sigma_long,
                    numpy.amax(delta_lat)+sigma_long, _2drms)
         # May need to change tolerance
-        if abs(_min - _max) < 0.000000001:
-            _min -= 1
-            _max += 1
+        # if abs(_min - _max) < 0.000000000000001:
+        #     _min -= 1
+        #     _max += 1
         plot.axis([_min, _max, _min, _max])
         plot.xticks(rotation=60)
         plot.xlabel('Delta Longitude (meters)')
@@ -76,7 +80,7 @@ class Plotter:
         subplot = plot.subplot(1, 2, 1)
         subplot.text(0.5, -0.15, 'Long-Variance: ' + str(numpy.var(long)) +
                   '\nLat-Variance ' + str(numpy.var(lat)) + '\nLong-Mean: ' +
-                  str(meters2long(numpy.mean(long), 42.277)) + '\nLat-Man: ' +
+                  str(meters2long(numpy.mean(long), 42.277)) + '\nLat-Mean: ' +
                   str(meters2lat(numpy.mean(lat))), ha='center', transform=subplot.transAxes)
         plot.legend(handles=[cep_label, _2drms_label], labels=['CEP', '2DRMS'])
 
@@ -85,8 +89,8 @@ class Plotter:
 
         # Plot
         plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
-        plot.plot(range(0, 5*self.data.shape[0], 5), self.data['speed'])
-        plot.axis([0, 5*self.data.shape[0], numpy.amin(self.data['speed']),
+        plot.plot(range(0, self.data.shape[0], 1), self.data['speed'])
+        plot.axis([0, self.data.shape[0], numpy.amin(self.data['speed']),
                   numpy.amax(self.data['speed'])])
         plot.xlabel('Time (seconds)')
         plot.ylabel('Speed (m/s)')
@@ -97,8 +101,8 @@ class Plotter:
 
         # Plot
         plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
-        plot.plot(range(0, 5*self.data.shape[0], 5), self.data['bearing'])
-        plot.axis([0, 5*self.data.shape[0], numpy.amin(self.data['bearing']),
+        plot.plot(range(0, self.data.shape[0], 1), self.data['bearing'])
+        plot.axis([0, self.data.shape[0], numpy.amin(self.data['bearing']),
                   numpy.amax(self.data['bearing'])])
         plot.xlabel('Time (seconds)')
         plot.ylabel('Bearing (degrees)')
@@ -138,20 +142,28 @@ class Plotter:
             self.plotCoords([1, 2, 1])
             self.plotSpeed([2, 2, 2])
             self.plotBearing([2, 2, 4])
+        elif data_type == 'newGps':
+            self.readCsv('newGps')
+            self.plotCoords([1, 2, 1])
+            self.plotSpeed([2, 2, 2])
+            self.plotBearing([2, 2, 4])
         elif data_type == 'gpsComp':
             self.readCsv('gps')
             self.plotPath('red')
             self.readCsv('truth')
             self.plotPath('black')
+            self.readCsv('movAvg')
+            self.plotPath('green')
             self.readCsv('odom')
             self.plotPath('blue')
+            
             # TODO add legend
         else:
             print('Invalid data type.')
             sys.exit()
 
         plot.tight_layout()
-        plot.suptitle(data_type)
+        plot.suptitle(data_type + ' ' + str(datetime.date.today()))
         plot.show()
 
 

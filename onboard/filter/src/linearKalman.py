@@ -1,7 +1,9 @@
 import numpy as np
-import math
+# import math
+from .conversions import meters2lat, meters2long
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
+from scipy.linalg import block_diag
 
 
 class LinearKalman:
@@ -39,34 +41,59 @@ class LinearKalman:
     # number of dimensions in state = block_size
 
     def __init__(self, x_initial, P_initial, Q, R, dt):
-        # Construct the Kalman Filter
+        # construct the Kalman Filter
         self.kf = KalmanFilter(dim_x=4, dim_z=4, dim_u=2)
+        x_initial = x_initial.asLKFInput()
         self.kf.x = np.array(x_initial)
+
+        # convert P_initial from meters to degrees
+        P_initial[:2] = meters2lat(P_initial[:2])
+        P_initial[2:] = meters2long(P_initial[2:], x_initial[0])
         self.kf.P[:] = np.diag(P_initial)
+
+        # convert R from meters to degrees
+        R[:2] = meters2lat(R[:2])
+        R[2:] = meters2long(R[2:], x_initial[0])
         self.kf.R[:] = np.diag(R)
+
         self.kf.F = np.array([[1., dt, 0., 0.],
                              [0., 1., 0., 0.],
                              [0., 0., 1., dt],
                              [0., 0., 0., 1.]])
+
         self.kf.B = np.array([[0.5*dt**2., 0.],
                              [dt, 0.],
                              [0., 0.5*dt**2.],
                              [0., dt]])
-        lat_conv = 180 / (math.pi * 6371000)
-        # TODO improve? currently using initial lat as reference
-        long_conv = lat_conv / math.cos((math.pi/180) * x_initial[0])
-        self.kf.H = np.diag([1, lat_conv, 1, long_conv])
-        if np.isscalar(Q):
-            self.kf.Q = Q_discrete_white_noise(dim=2, dt=dt, var=Q,
-                                               block_size=2)
-        else:
-            self.kf.Q[:] = np.diag(Q)
-        # self.kf.R *= R
 
-    def run(self, u, z):
-        # Predicts forward using control u and updates with measurement z
-        # Returns new state
+        self.kf.H = np.diag([1, meters2lat(1),
+                             1, meters2long(1, x_initial[0])])
+
+        # calculate process noise
+        Q_lat = Q_discrete_white_noise(dim=2, dt=dt,
+                                       var=meters2lat(Q),
+                                       block_size=1)
+        Q_long = Q_discrete_white_noise(dim=2, dt=dt,
+                                        var=meters2long(Q, x_initial[0]),
+                                        block_size=1)
+        self.kf.Q = block_diag(Q_lat, Q_long)
+
+    def run(self, gps, imu, state_estimate):
+        # predicts forward given sensors
+        # returns new state
+        measured_pos = gps.asDecimal()
+        measured_vel = gps.absolutifyVel(imu.bearing)
+        measured_accel = imu.absolutifyAccel(imu.bearing, imu.pitch)
+
+        # create measurement and control vectors
+        u = [meters2lat(measured_accel.north),
+             meters2long(measured_accel.west, measured_pos.lat_deg)]
+
+        z = [measured_pos.lat_deg, meters2lat(measured_vel.north),
+             measured_pos.long_deg,
+             meters2long(measured_vel.west, measured_pos.lat_deg)]
+
         self.kf.predict(np.array(u))
         self.kf.update(np.array(z))
 
-        return self.kf.x
+        state_estimate.updateFromLKF(self.kf.x, imu.bearing)
