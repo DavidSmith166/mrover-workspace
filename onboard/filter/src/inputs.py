@@ -1,6 +1,6 @@
 import math
 from abc import ABC
-from .conversions import min2decimal
+from .conversions import min2decimal, deg2rad
 
 
 class RawAccelSensor(ABC):
@@ -22,13 +22,14 @@ class RawAccelSensor(ABC):
             self.accel_z is not None
 
     # Converts acceleration to absolute components
-    def absolutifyAccel(self, bearing, pitch):
-        if self.accel_x is None or bearing is None or pitch is None:
+    def absolutifyAccel(self, bearing_degs, pitch_degs):
+        if self.accel_x is None or bearing_degs is None or pitch_degs is None:
             return None
 
-        accel_north = self.accel_x * math.cos(pitch) * math.sin(90 - bearing)
-        accel_west = -self.accel_x * math.cos(pitch) * math.cos(90 - bearing)
-        accel_z = self.accel_x * math.sin(pitch)
+        accel_north = self.accel_x * math.cos(deg2rad(pitch_degs)) * \
+                      math.sin(deg2rad(90 - bearing_degs))
+        accel_west = -self.accel_x * math.cos(deg2rad(pitch_degs)) * math.cos(deg2rad(90 - bearing_degs))
+        accel_z = self.accel_x * math.sin(deg2rad(pitch_degs))
         return Acceleration(accel_north, accel_west, accel_z)
 
 
@@ -46,16 +47,16 @@ class RawVelSensor(ABC):
         return self.vel_raw is not None
 
     # Separates vel_raw into absolute components
-    def absolutifyVel(self, bearing):
-        if self.vel_raw is None or bearing is None:
+    def absolutifyVel(self, bearing_degs):
+        if self.vel_raw is None or bearing_degs is None:
             return None
 
         # Throw out negative velocities
         if self.vel_raw < 0:
             return None
 
-        vel_north = self.vel_raw * math.sin(90 - bearing)
-        vel_west = -self.vel_raw * math.cos(90 - bearing)
+        vel_north = self.vel_raw * math.sin(deg2rad(90 - bearing_degs))
+        vel_west = -self.vel_raw * math.cos(deg2rad(90 - bearing_degs))
         return Velocity2D(vel_north, vel_west)
 
 
@@ -86,18 +87,18 @@ class RawBearingSensor(ABC):
     # Abstract class for bearing sensors
 
     def __init__(self):
-        self.bearing = None
+        self.bearing_degs = None
 
     def ready(self):
-        return self.bearing is not None
+        return self.bearing_degs is not None
 
     def update(self, new_bearing_sensor):
         # Account for non-standardized LCM structs >:(
-        # TODO check for degrees vs radians
         if hasattr(new_bearing_sensor, 'bearing'):
-            self.bearing = new_bearing_sensor.bearing
+            # TODO check for degrees vs radians
+            self.bearing_degs = new_bearing_sensor.bearing
         else:
-            self.bearing = new_bearing_sensor.bearing_deg
+            self.bearing_degs = new_bearing_sensor.bearing_deg
 
 
 class RawIMU(RawAccelSensor, RawBearingSensor):
@@ -112,9 +113,9 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
         self.mag_x = None
         self.mag_y = None
         self.mag_z = None
-        self.roll = None
-        self.pitch = None
-        self.yaw = None
+        self.roll_degs = None
+        self.pitch_degs = None
+        self.yaw_degs = None
 
     def update(self, new_imu):
         # Updates the IMU with new LCM data
@@ -128,7 +129,7 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
         self.mag_z = new_imu.mag_z
         # TODO check for degrees or radians
         # TODO add roll and yaw
-        self.pitch = new_imu.pitch
+        self.pitch_degs = new_imu.pitch
 
     def ready(self):
         # TODO add roll and yaw
@@ -136,7 +137,7 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
             RawBearingSensor.ready(self) and self.gyro_x is not None and \
             self.gyro_y is not None and self.gyro_z is not None and \
             self.mag_x is not None and self.mag_y is not None and \
-            self.mag_z is not None and self.pitch is not None
+            self.mag_z is not None and self.pitch_degs is not None
 
 
 class RawEncoder(RawVelSensor):

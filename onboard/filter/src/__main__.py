@@ -22,10 +22,10 @@ class StateEstimate:
     # class for the current state estimates
 
     def __init__(self, lat_deg=None, lat_min=None, vel_north=None,
-                 long_deg=None, long_min=None, vel_west=None, bearing=None):
+                 long_deg=None, long_min=None, vel_west=None, bearing_degs=None):
         self.pos = PositionDegs(lat_deg, long_deg, lat_min, long_min)
         self.vel = Velocity2D(vel_north, vel_west)
-        self.bearing = bearing
+        self.bearing_degs = bearing_degs
 
     def asLKFInput(self):
         # Returns the state estimate as a list for filter input
@@ -33,21 +33,20 @@ class StateEstimate:
                 self.pos.long_deg, meters2long(self.vel.west,
                                                self.pos.lat_deg)]
 
-    def updateFromLKF(self, numpy_array, bearing):
+    def updateFromLKF(self, numpy_array, bearing_degs):
         # Updates the list from the numpy array output of the filter
         self.pos.lat_deg = numpy_array[0]
         self.pos.long_deg = numpy_array[2]
         self.vel.north = lat2meters(numpy_array[1])
         self.vel.west = long2meters(numpy_array[3], numpy_array[0])
-        self.bearing = bearing
+        self.bearing_degs = bearing_degs
 
     def asOdom(self):
         # Returns the current state estimate as an Odometry LCM object
         odom = Odometry()
         odom.latitude_deg, odom.latitude_min = decimal2min(self.pos.lat_deg)
         odom.longitude_deg, odom.longitude_min = decimal2min(self.pos.long_deg)
-        # TODO check for degrees vs radians
-        odom.bearing_deg = self.bearing * math.pi / 180
+        odom.bearing_deg = self.bearing_degs
         odom.speed = self.vel.pythagorean()
         return odom
 
@@ -126,11 +125,11 @@ class SensorFusion:
         # Construct state estimate and filter if sensors are ready
         elif self.sensorsReady():
             pos = self.gps.asDecimal()
-            vel = self.gps.absolutifyVel(self.imu.bearing)
+            vel = self.gps.absolutifyVel(self.imu.bearing_degs)
 
             self.state_estimate = StateEstimate(pos.lat_deg, None, vel.north,
                                                 pos.long_deg, None, vel.west,
-                                                self.imu.bearing)
+                                                self.imu.bearing_degs)
             self.constructFilter()
 
     # def navStatusCallback(self, channel, msg):
