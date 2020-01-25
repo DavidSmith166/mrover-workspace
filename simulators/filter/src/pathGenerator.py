@@ -38,8 +38,8 @@ class PathGenerator:
             self.MAX_JERK = config['max_jerk']
             self.MAX_ACCEL = config['max_accel']
             self.MIN_ACCEL = config['min_accel']
-            self.MAX_ROT_VEL_RADS = config['max_rot_vel_rads']
-            self.MAX_PITCH_VEL_RADS = config['max_pitch_vel_rads']
+            self.MAX_ROT_VEL_DEGS = rad2deg(config['max_rot_vel_rads'])
+            self.MAX_PITCH_VEL_DEGS = rad2deg(config['max_pitch_vel_rads'])
             self.DT_S = config['dt_s']
             self.END_TIME = config['end_time']
         self.MAX_READINGS = np.int_(self.END_TIME / self.DT_S)
@@ -58,14 +58,14 @@ class PathGenerator:
             last_point = new_point
             yield np.float64(new_point)
 
-    # generates angles in radians
+    # generates angles in degrees
     def angle_gen(self, delta):
-        last_angle = random.uniform(0, 2*math.pi)
+        last_angle = random.uniform(0, 360)
         num_angles = 1
         yield np.float64(last_angle)
         while num_angles < self.MAX_READINGS:
-            new_angle = random.uniform((last_angle - delta) % 2*math.pi,
-                                       (last_angle + delta) % 2*math.pi)
+            new_angle = random.uniform((last_angle - delta) % 360,
+                                       (last_angle + delta) % 360)
             num_angles += 1
             last_angle = new_angle
             yield np.float64(new_angle)
@@ -77,16 +77,15 @@ class PathGenerator:
 
             # generate control inputs
             accel_points_x = np.fromiter(self.point_gen(), np.float64, count=self.MAX_READINGS)
-            bearing_angles_rads = np.fromiter(self.angle_gen(self.MAX_ROT_VEL_RADS), np.float64,
+            bearing_angles_degs = np.fromiter(self.angle_gen(self.MAX_ROT_VEL_DEGS), np.float64,
                                               count=self.MAX_READINGS)
-            pitch_angles_rads = np.fromiter(self.angle_gen(self.MAX_PITCH_VEL_RADS), np.float64,
+            pitch_angles_degs = np.fromiter(self.angle_gen(self.MAX_PITCH_VEL_DEGS), np.float64,
                                             count=self.MAX_READINGS)
 
             # generate absolute accelerations
-            bearing_sin = [math.sin(deg2rad(90) - i) for i in bearing_angles_rads]
-            bearing_cos = [math.cos(deg2rad(90) - i) for i in bearing_angles_rads]
-            pitch_cos = [math.cos(i) for i in pitch_angles_rads]
-            # pitch_sin = [math.sin(i) for i in pitch_angles_rads]
+            bearing_sin = [math.sin(deg2rad(90 - i)) for i in bearing_angles_degs]
+            bearing_cos = [math.cos(deg2rad(90 - i)) for i in bearing_angles_degs]
+            pitch_cos = [math.cos(deg2rad(i)) for i in pitch_angles_degs]
             accel_points_north = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_sin))
             accel_points_west = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_cos))
 
@@ -97,10 +96,9 @@ class PathGenerator:
                                          for i in range(len(vel_points_north))])
 
             gps_points_north = scipy.integrate.cumtrapz(vel_points_north, dx=self.DT_S)
-            gps_points_north = [meters2lat(i) for i in gps_points_north]
+            gps_points_north = meters2lat(gps_points_north)
             gps_points_west = scipy.integrate.cumtrapz(vel_points_west, dx=self.DT_S)
-            gps_points_west = [meters2long(gps_points_west[i], gps_points_west[i])
-                               for i in range(len(gps_points_west))]
+            gps_points_west = meters2long(gps_points_west[i], gps_points_north[i])
             gps_points_north = [i + 42.277 for i in gps_points_north]
             gps_points_west = [i + 83.7382 for i in gps_points_west]
 
@@ -113,7 +111,7 @@ class PathGenerator:
                 "vel_total": vel_points_total,
                 "gps_north": gps_points_north,
                 "gps_west": gps_points_west,
-                "bearing": bearing_angles_rads
+                "bearing": bearing_angles_degs
             }
 
             # noise it up
@@ -123,16 +121,17 @@ class PathGenerator:
 
             noisy_vel_points_total = np.random.normal(vel_points_total, self.GPS_VEL_STDEV_METERS)
 
-            # noisy_gps_points_north = np.random.normal(gps_points_north,
-            #                                           meters2lat(self.GPS_POS_STDEV_METERS))
-            noisy_gps_points_north = np.random.normal(gps_points_north, 0.00002)
-            # noisy_gps_points_west = np.random.normal(gps_points_west, [abs(i) for i in
-            #                                                            meters2long(self.GPS_POS_STDEV_METERS,
-            #                                                                        gps_points_north)])
-            noisy_gps_points_west = np.random.normal(gps_points_west, 0.00002)
+            noisy_gps_points_north = np.random.normal(gps_points_north,
+                                                      meters2lat(self.GPS_POS_STDEV_METERS))
+            # noisy_gps_points_north = np.random.normal(gps_points_north, 0.00002)
+            noisy_gps_points_west = np.random.normal(gps_points_west,
+                                                     [abs(i) for i in
+                                                      meters2long(self.GPS_POS_STDEV_METERS,
+                                                                  gps_points_north)])
+            # noisy_gps_points_west = np.random.normal(gps_points_west, 0.00002)
 
-            noisy_bearing_angles_rads = np.random.normal(bearing_angles_rads, deg2rad(self.IMU_BEARING_STDEV_DEGS))
-            noisy_pitch_angles_rads = np.random.normal(pitch_angles_rads, deg2rad(self.IMU_PITCH_STDEV_DEGS))
+            noisy_bearing_angles_degs = np.random.normal(bearing_angles_degs, self.IMU_BEARING_STDEV_DEGS)
+            noisy_pitch_angles_degs = np.random.normal(pitch_angles_degs, self.IMU_PITCH_STDEV_DEGS)
 
             noisy = {
                 "accel_x": noisy_accel_points_x,
@@ -141,19 +140,19 @@ class PathGenerator:
                 "vel_total": noisy_vel_points_total,
                 "gps_north": noisy_gps_points_north,
                 "gps_west": noisy_gps_points_west,
-                "bearing": noisy_bearing_angles_rads,
-                "pitch": noisy_pitch_angles_rads
+                "bearing": noisy_bearing_angles_degs,
+                "pitch": noisy_pitch_angles_degs
             }
 
-            delta = [abs(i) for i in gps_points_north - noisy_gps_points_north]
-            print(np.max(delta))
-            print(max(gps_points_north))
-            delta = [abs(i) for i in vel_points_total - noisy_vel_points_total]
-            print(np.max(delta))
-            print(max(vel_points_total))
-            delta = [abs(i) for i in accel_points_x - noisy_accel_points_x]
-            print(np.max(delta))
-            print(max(accel_points_x))
+            # delta = [abs(i) for i in gps_points_north - noisy_gps_points_north]
+            # print(np.max(delta))
+            # print(max(gps_points_north))
+            # delta = [abs(i) for i in vel_points_total - noisy_vel_points_total]
+            # print(np.max(delta))
+            # print(max(vel_points_total))
+            # delta = [abs(i) for i in accel_points_x - noisy_accel_points_x]
+            # print(np.max(delta))
+            # print(max(accel_points_x))
 
             yield {"truth": truth, "noisy": noisy}
 
@@ -162,15 +161,34 @@ class PathGenerator:
 
 
 def meters2lat(meters):
-    return (meters * 180) / (math.pi * 6371000)
+    if np.isscalar(meters):
+        return rad2deg(meters / 6371000)
+    else:
+        return [rad2deg(i / 6371000) for i in meters]
 
 
 def meters2long(meters, lat):
-    if np.isscalar(lat):
-        return meters2lat(meters) / math.cos((math.pi/180) * lat)
+    if np.isscalar(meters):
+        if np.isscalar(lat):
+            return meters2lat(meters) / math.cos(deg2rad(lat))
+        else:
+            return [meters2lat(meters) / math.cos(deg2rad(i)) for i in lat]
     else:
-        return [meters2lat(meters) / math.cos((math.pi/180) * i) for i in lat]
+        if np.isscalar(lat):
+            return [meters2lat(i) / math.cos(deg2rad(lat)) for i in meters]
+        else:
+            return [meters2lat(i) / math.cos(deg2rad(j)) for i, j in zip(meters, lat)]
 
 
-def deg2rad(degs):
-    return degs * math.pi / 180
+def deg2rad(deg):
+    if np.isscalar(deg):
+        return math.radians(deg)
+    else:
+        return [math.radians(i) for i in deg]
+
+
+def rad2deg(rad):
+    if np.isscalar(rad):
+        return math.degrees(rad)
+    else:
+        return [math.degrees(i) for i in rad]

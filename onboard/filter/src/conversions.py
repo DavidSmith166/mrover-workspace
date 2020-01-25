@@ -46,16 +46,16 @@ def long2meters(long, lat):
 
 def deg2rad(deg):
     if np.isscalar(deg):
-        return deg * math.pi / 180
+        return math.radians(deg)
     else:
-        return [i * math.pi / 180 for i in deg]
+        return [math.radians(i) for i in deg]
 
 
 def rad2deg(rad):
     if np.isscalar(rad):
-        return rad * 180 / math.pi
+        return math.degrees(rad)
     else:
-        return [i * 180 / math.pi for i in rad]
+        return [math.degrees(i) for i in rad]
 
 
 def decimal2min(decimal):
