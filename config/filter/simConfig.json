@@ -15,7 +15,9 @@
     "max_rot_vel_rads" : 2.5,
     "max_pitch_vel_rads" : 0.5,
     "dt_s" : 0.01,
-    "end_time" : 50,
+    "end_time" : 100,
 
-    "csv_mode" : "a"
+    "csv_mode" : "a",
+
+    "new_path" : true
 }

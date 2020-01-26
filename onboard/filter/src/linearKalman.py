@@ -1,9 +1,8 @@
 import numpy as np
-# import math
-from .conversions import meters2lat, meters2long
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 from scipy.linalg import block_diag
+from .conversions import meters2lat, meters2long
 
 
 class LinearKalman:
@@ -66,8 +65,7 @@ class LinearKalman:
                              [0., 0.5*dt**2.],
                              [0., dt]])
 
-        self.kf.H = np.diag([1, meters2lat(1),
-                             1, meters2long(1, x_initial[0])])
+        self.kf.H = np.eye(4)
 
         # calculate process noise
         Q_lat = Q_discrete_white_noise(dim=2, dt=dt,
@@ -82,8 +80,8 @@ class LinearKalman:
         # predicts forward given sensors
         # returns new state
         measured_pos = gps.asDecimal()
-        measured_vel = gps.absolutifyVel(imu.bearing)
-        measured_accel = imu.absolutifyAccel(imu.bearing, imu.pitch)
+        measured_vel = gps.absolutifyVel(imu.bearing_degs)
+        measured_accel = imu.absolutifyAccel(imu.bearing_degs, imu.pitch_degs)
 
         # create measurement and control vectors
         u = [meters2lat(measured_accel.north),
@@ -96,4 +94,4 @@ class LinearKalman:
         self.kf.predict(np.array(u))
         self.kf.update(np.array(z))
 
-        state_estimate.updateFromLKF(self.kf.x, imu.bearing)
+        state_estimate.updateFromLKF(self.kf.x, imu.bearing_degs)

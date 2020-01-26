@@ -27,7 +27,7 @@ class RawAccelSensor(ABC):
             return None
 
         accel_north = self.accel_x * math.cos(deg2rad(pitch_degs)) * \
-                      math.sin(deg2rad(90 - bearing_degs))
+            math.sin(deg2rad(90 - bearing_degs))
         accel_west = -self.accel_x * math.cos(deg2rad(pitch_degs)) * math.cos(deg2rad(90 - bearing_degs))
         accel_z = self.accel_x * math.sin(deg2rad(pitch_degs))
         return Acceleration(accel_north, accel_west, accel_z)
