@@ -1,5 +1,5 @@
 import json
-import math
+# import math
 # import time
 # import sys
 from os import getenv
@@ -15,7 +15,7 @@ from .linearKalman import LinearKalman
 from .conversions import meters2lat, meters2long, lat2meters, long2meters, \
                         decimal2min
 # don't have nav status in here yet
-# TODO handle losing GPS fix
+# TODO handle losing sensors
 
 
 class StateEstimate:

@@ -1,11 +1,9 @@
 import csv
 import json
-# import os
-from os import getenv
+import os
 import time
 
 from rover_common import aiolcm
-# from rover_common.aiohelper import run_coroutines
 from rover_msgs import IMU, GPS, NavStatus, Odometry, \
                        SensorPackage
 
@@ -14,16 +12,17 @@ class Logger:
 
     def __init__(self):
         # Read in options from logConfig
-        config_path = getenv('MROVER_CONFIG')
+        config_path = os.getenv('MROVER_CONFIG')
         config_path += "/config_filter/logConfig.json"
         with open(config_path, "r") as config:
             self.logConfig = json.load(config)
 
+        config_path = os.getenv('MROVER_CONFIG')
+        config_path += "/config_filter/config.json"
+        with open(config_path, "r") as config:
+            self.filterConfig = json.load(config)
+
         # Create files and write headers
-
-        # path_self = os.path.abspath(os.path.dirname(__file__))
-        # self.file_path = os.path.join(os.getcwd(), "onboard", "filter", "logs")
-
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
                     'speed'], 'gps')
         self.write(['accel_x', 'accel_y', 'accel_z', 'gyro_x', 'gyro_y',
@@ -37,6 +36,13 @@ class Logger:
                     'speed'], 'odom')
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
                     'speed'], 'movAvg')
+        self.write(['Q', 'FilterType', 'P_initial', 'R', 'dt', 'UpdateRate'], 'config')
+
+        P_initial_str = str(self.filterConfig['P_initial']).replace(',', ' ')
+        R_str = str(self.filterConfig['R']).replace(',', ' ')
+        self.write([self.filterConfig['Q'], self.filterConfig['FilterType'],
+                    P_initial_str, R_str, self.filterConfig['dt'],
+                    self.filterConfig['UpdateRate']], 'config')
 
         # Subscribe to LCM channels
         self.lcm = aiolcm.AsyncLCM()
@@ -60,7 +66,7 @@ class Logger:
     def write(self, contents, type):
         # Writes contents to the log specified by type
         # with open(self.file_path + type + 'Log.csv', 'w') as log:
-        with open(type + 'Log.csv', mode=self.logConfig['mode']) as log:
+        with open(os.path.join('onboard', 'filter', 'logs', type + 'Log.csv'), mode=self.logConfig['mode']) as log:
             writer = csv.writer(log)
             writer.writerow(contents)
 

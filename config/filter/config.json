@@ -5,7 +5,7 @@
 
     "FilterType": "LinearKalman",
 
-    "P_initial": [150, 12, 150, 12],
+    "P_initial": [0, 1, 0, 1],
 
     "R": [1, 0.0016, 1, 0.0016],
 

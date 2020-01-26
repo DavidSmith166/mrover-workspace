@@ -22,6 +22,7 @@ filtered path from truth
 
 
 class PathGenerator:
+    # TODO retain prev path
 
     def __init__(self):
         # Fetch constants
@@ -45,7 +46,7 @@ class PathGenerator:
         self.MAX_READINGS = np.int_(self.END_TIME / self.DT_S)
 
     # generates accelerations in m/s2
-    def point_gen(self):
+    def pointGen(self):
         last_point = random.uniform(self.MIN_ACCEL, self.MAX_ACCEL)
         num_points = 1
         yield np.float64(last_point)
@@ -59,7 +60,7 @@ class PathGenerator:
             yield np.float64(new_point)
 
     # generates angles in degrees
-    def angle_gen(self, delta):
+    def angleGen(self, delta):
         last_angle = random.uniform(0, 360)
         num_angles = 1
         yield np.float64(last_angle)
@@ -70,94 +71,93 @@ class PathGenerator:
             last_angle = new_angle
             yield np.float64(new_angle)
 
+    # generates a true path (m/s)
+    def generateTruth(self):
+
+        # generate control inputs
+        accel_points_x = np.fromiter(self.pointGen(), np.float64, count=self.MAX_READINGS)
+        bearing_angles_degs = np.fromiter(self.angleGen(self.MAX_ROT_VEL_DEGS), np.float64,
+                                          count=self.MAX_READINGS)
+        pitch_angles_degs = np.fromiter(self.angleGen(self.MAX_PITCH_VEL_DEGS), np.float64,
+                                        count=self.MAX_READINGS)
+
+        # generate absolute accelerations
+        bearing_sin = [math.sin(deg2rad(90 - i)) for i in bearing_angles_degs]
+        bearing_cos = [math.cos(deg2rad(90 - i)) for i in bearing_angles_degs]
+        pitch_cos = [math.cos(deg2rad(i)) for i in pitch_angles_degs]
+        accel_points_north = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_sin))
+        accel_points_west = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_cos))
+
+        # generate derivatives
+        vel_points_north = scipy.integrate.cumtrapz(accel_points_north, dx=self.DT_S)
+        vel_points_west = scipy.integrate.cumtrapz(accel_points_west, dx=self.DT_S)
+        vel_points_total = np.array([math.sqrt(vel_points_north[i]**2 + vel_points_west[i]**2)
+                                     for i in range(len(vel_points_north))])
+
+        gps_points_north = scipy.integrate.cumtrapz(vel_points_north, dx=self.DT_S)
+        gps_points_north = meters2lat(gps_points_north)
+        gps_points_west = scipy.integrate.cumtrapz(vel_points_west, dx=self.DT_S)
+        gps_points_west = meters2long(gps_points_west, gps_points_north)
+        gps_points_north = [i + 42.277 for i in gps_points_north]
+        gps_points_west = [i + 83.7382 for i in gps_points_west]
+
+        return {
+            "accel_x": accel_points_x,
+            "accel_y": np.zeros(self.MAX_READINGS),
+            "accel_z": np.zeros(self.MAX_READINGS),
+            "vel_north": vel_points_north,
+            "vel_west": vel_points_west,
+            "vel_total": vel_points_total,
+            "gps_north": gps_points_north,
+            "gps_west": gps_points_west,
+            "bearing": bearing_angles_degs,
+            "pitch": pitch_angles_degs
+        }
+
+    # applies noise to a true path
+    def applyNoise(self, truth):
+
+        noisy_accel_points_x = np.random.normal(truth['accel_x'], self.IMU_ACCEL_STDEV_METERS)
+        noisy_accel_points_y = np.random.normal(np.zeros(self.MAX_READINGS), self.IMU_ACCEL_STDEV_METERS)
+        noisy_accel_points_z = np.random.normal(np.zeros(self.MAX_READINGS), self.IMU_ACCEL_STDEV_METERS)
+
+        noisy_vel_points_total = np.random.normal(truth['vel_total'], self.GPS_VEL_STDEV_METERS)
+
+        noisy_gps_points_north = np.random.normal(truth['gps_north'],
+                                                  meters2lat(self.GPS_POS_STDEV_METERS))
+        noisy_gps_points_west = np.random.normal(truth['gps_west'],
+                                                 [abs(i) for i in
+                                                  meters2long(self.GPS_POS_STDEV_METERS,
+                                                              truth['gps_north'])])
+
+        noisy_bearing_angles_degs = np.random.normal(truth['bearing'], self.IMU_BEARING_STDEV_DEGS)
+        noisy_pitch_angles_degs = np.random.normal(truth['pitch'], self.IMU_PITCH_STDEV_DEGS)
+
+        return {
+            "accel_x": noisy_accel_points_x,
+            "accel_y": noisy_accel_points_y,
+            "accel_z": noisy_accel_points_z,
+            "vel_total": noisy_vel_points_total,
+            "gps_north": noisy_gps_points_north,
+            "gps_west": noisy_gps_points_west,
+            "bearing": noisy_bearing_angles_degs,
+            "pitch": noisy_pitch_angles_degs
+        }
+
     def generator(self):
-        # units are m/s
 
         while True:
+            self.truth = self.generateTruth()
+            self.noisy = self.applyNoise(self.truth)
 
-            # generate control inputs
-            accel_points_x = np.fromiter(self.point_gen(), np.float64, count=self.MAX_READINGS)
-            bearing_angles_degs = np.fromiter(self.angle_gen(self.MAX_ROT_VEL_DEGS), np.float64,
-                                              count=self.MAX_READINGS)
-            pitch_angles_degs = np.fromiter(self.angle_gen(self.MAX_PITCH_VEL_DEGS), np.float64,
-                                            count=self.MAX_READINGS)
+            yield {"truth": self.truth, "noisy": self.noisy}
 
-            # generate absolute accelerations
-            bearing_sin = [math.sin(deg2rad(90 - i)) for i in bearing_angles_degs]
-            bearing_cos = [math.cos(deg2rad(90 - i)) for i in bearing_angles_degs]
-            pitch_cos = [math.cos(deg2rad(i)) for i in pitch_angles_degs]
-            accel_points_north = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_sin))
-            accel_points_west = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_cos))
-
-            # generate derivatives
-            vel_points_north = scipy.integrate.cumtrapz(accel_points_north, dx=self.DT_S)
-            vel_points_west = scipy.integrate.cumtrapz(accel_points_west, dx=self.DT_S)
-            vel_points_total = np.array([math.sqrt(vel_points_north[i]**2 + vel_points_west[i]**2)
-                                         for i in range(len(vel_points_north))])
-
-            gps_points_north = scipy.integrate.cumtrapz(vel_points_north, dx=self.DT_S)
-            gps_points_north = meters2lat(gps_points_north)
-            gps_points_west = scipy.integrate.cumtrapz(vel_points_west, dx=self.DT_S)
-            gps_points_west = meters2long(gps_points_west[i], gps_points_north[i])
-            gps_points_north = [i + 42.277 for i in gps_points_north]
-            gps_points_west = [i + 83.7382 for i in gps_points_west]
-
-            truth = {
-                "accel_x": accel_points_x,
-                "accel_y": np.zeros(self.MAX_READINGS),
-                "accel_z": np.zeros(self.MAX_READINGS),
-                "vel_north": vel_points_north,
-                "vel_west": vel_points_west,
-                "vel_total": vel_points_total,
-                "gps_north": gps_points_north,
-                "gps_west": gps_points_west,
-                "bearing": bearing_angles_degs
-            }
-
-            # noise it up
-            noisy_accel_points_x = np.random.normal(accel_points_x, self.IMU_ACCEL_STDEV_METERS)
-            noisy_accel_points_y = np.random.normal(np.zeros(self.MAX_READINGS), self.IMU_ACCEL_STDEV_METERS)
-            noisy_accel_points_z = np.random.normal(np.zeros(self.MAX_READINGS), self.IMU_ACCEL_STDEV_METERS)
-
-            noisy_vel_points_total = np.random.normal(vel_points_total, self.GPS_VEL_STDEV_METERS)
-
-            noisy_gps_points_north = np.random.normal(gps_points_north,
-                                                      meters2lat(self.GPS_POS_STDEV_METERS))
-            # noisy_gps_points_north = np.random.normal(gps_points_north, 0.00002)
-            noisy_gps_points_west = np.random.normal(gps_points_west,
-                                                     [abs(i) for i in
-                                                      meters2long(self.GPS_POS_STDEV_METERS,
-                                                                  gps_points_north)])
-            # noisy_gps_points_west = np.random.normal(gps_points_west, 0.00002)
-
-            noisy_bearing_angles_degs = np.random.normal(bearing_angles_degs, self.IMU_BEARING_STDEV_DEGS)
-            noisy_pitch_angles_degs = np.random.normal(pitch_angles_degs, self.IMU_PITCH_STDEV_DEGS)
-
-            noisy = {
-                "accel_x": noisy_accel_points_x,
-                "accel_y": noisy_accel_points_y,
-                "accel_z": noisy_accel_points_z,
-                "vel_total": noisy_vel_points_total,
-                "gps_north": noisy_gps_points_north,
-                "gps_west": noisy_gps_points_west,
-                "bearing": noisy_bearing_angles_degs,
-                "pitch": noisy_pitch_angles_degs
-            }
-
-            # delta = [abs(i) for i in gps_points_north - noisy_gps_points_north]
-            # print(np.max(delta))
-            # print(max(gps_points_north))
-            # delta = [abs(i) for i in vel_points_total - noisy_vel_points_total]
-            # print(np.max(delta))
-            # print(max(vel_points_total))
-            # delta = [abs(i) for i in accel_points_x - noisy_accel_points_x]
-            # print(np.max(delta))
-            # print(max(accel_points_x))
-
-            yield {"truth": truth, "noisy": noisy}
-
-    def run(self):
-        return next(self.generator())
+    def run(self, new_path):
+        # returns true and noisy paths. generates new path if new_path
+        if new_path:
+            return next(self.generator())
+        else:
+            return {"truth": self.truth, "noisy": self.noisy}
 
 
 def meters2lat(meters):
