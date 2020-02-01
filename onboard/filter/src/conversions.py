@@ -34,14 +34,14 @@ def lat2meters(lat):
 def long2meters(long, lat):
     if np.isscalar(long):
         if np.isscalar(lat):
-            return lat2meters(long) * math.cos(deg2rad(lat))
+            return lat2meters(long * math.cos(deg2rad(lat)))
         else:
-            return [lat2meters(long) * math.cos(deg2rad(i)) for i in lat]
+            return [lat2meters(long * math.cos(deg2rad(i))) for i in lat]
     else:
         if np.isscalar(lat):
-            return [lat2meters(i) * math.cos(deg2rad(lat)) for i in long]
+            return [lat2meters(i * math.cos(deg2rad(lat))) for i in long]
         else:
-            return [lat2meters(i) * math.cos(deg2rad(j)) for i, j in zip(long, lat)]
+            return [lat2meters(i * math.cos(deg2rad(j))) for i, j in zip(long, lat)]
 
 
 def deg2rad(deg):
