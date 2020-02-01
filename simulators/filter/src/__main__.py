@@ -19,13 +19,14 @@ class Simulator:
             self.GPS_UPDATE_RATE_MILLIS = config['gps_update_rate_millis']
             self.IMU_UPDATE_RATE_MILLIS = config['imu_update_rate_millis']
             self.DT_MILLIS = config['dt_s'] * 1000
+            self.SEND_RATE_MILLIS = config['send_rate_millis']
             self.CSV_MODE = config['csv_mode']
-            self.new_path = config['new_path']
+            self.NEW_PATH = config['new_path']
         self.GPS_DTS = int(self.GPS_UPDATE_RATE_MILLIS / self.DT_MILLIS)
         self.IMU_DTS = int(self.IMU_UPDATE_RATE_MILLIS / self.DT_MILLIS)
 
         self.path_generator = PathGenerator()
-        path_out = self.path_generator.run(self.new_path)
+        path_out = self.path_generator.run(self.NEW_PATH)
         self.truth = path_out['truth']
         self.noisy = path_out['noisy']
 
@@ -49,7 +50,7 @@ class Simulator:
 
     def sendTimestep(self):
         # send at update rate
-        if (time.time() * 1000 - self.millis) < self.DT_MILLIS:
+        if (time.time() * 1000 - self.millis) < self.SEND_RATE_MILLIS:
             return
 
         imu = IMU()
@@ -69,7 +70,7 @@ class Simulator:
         gps.longitude_min, gps.longitude_deg = math.modf(self.noisy['gps_west'][self.timesteps])
         gps.longitude_deg = int(gps.longitude_deg)
         gps.longitude_min *= 60
-        gps.bearing_deg = self.noisy['bearing'][self.timesteps] * 180 / math.pi
+        gps.bearing_deg = self.noisy['bearing'][self.timesteps]
         gps.speed = self.noisy['vel_total'][self.timesteps]
 
         if self.timesteps % self.GPS_DTS == 0:
@@ -78,6 +79,7 @@ class Simulator:
 
         if self.timesteps % self.IMU_DTS == 0:
             self.lcm.publish('/imu', imu.encode())
+            # print(self.timesteps / self.IMU_DTS)
             # print('Sending IMU')
 
         self.millis = time.time() * 1000

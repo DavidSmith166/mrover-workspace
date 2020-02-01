@@ -99,9 +99,10 @@ class Plotter:
         plot.ylabel('Bearing (degrees)')
         plot.title('Bearing')
     
-    def plotPath(self, color, label):
+    def plotPath(self, color, label, subplot_loc):
         # Convert DMS to decimal
-        long = self.data['long_deg'] + self.data['long_min']/60
+        plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
+        long = -(self.data['long_deg'] + self.data['long_min']/60)
         lat = self.data['lat_deg'] + self.data['lat_min']/60
 
         return plot.scatter(long, lat, color=color, label=label)
@@ -123,9 +124,14 @@ class Plotter:
             self.plotBearing([2, 2, 4])
         # elif data_type == 'imu':
             # self.plotImu()
+        elif data_type == 'truth':
+            self.readCsv('truth', float, True)
+            self.plotPath('black','truth',[1, 2, 1])
+            self.plotSpeed([2, 2, 2])
+            self.plotBearing([2, 2, 4])
         elif data_type == 'odom':
             self.readCsv('odom', float, True)
-            self.plotCoords([1, 2, 1])
+            self.plotPath('black','odom',[1, 2, 1])
             self.plotSpeed([2, 2, 2])
             self.plotBearing([2, 2, 4])
         elif data_type == 'newGps':
@@ -135,13 +141,13 @@ class Plotter:
             self.plotBearing([2, 2, 4])
         elif data_type == 'filterSim':
             self.readCsv('gps', float, True)
-            self.plotPath('red', 'gps')
+            self.plotPath('red', 'gps', [1, 1, 1])
             self.readCsv('truth', float, True)
-            self.plotPath('black', 'truth')
+            self.plotPath('black', 'truth', [1, 1, 1])
             self.readCsv('movAvg', float, True)
-            self.plotPath('green', 'moving average')
+            self.plotPath('green', 'moving average', [1, 1, 1])
             self.readCsv('odom', float, True)
-            self.plotPath('blue', 'kalman filter')
+            self.plotPath('blue', 'kalman filter', [1, 1, 1])
 
             plot.xlabel('Latitude (degrees)')
             plot.ylabel('Longitude (degrees)')

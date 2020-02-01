@@ -26,9 +26,13 @@ class RawAccelSensor(ABC):
         if self.accel_x is None or bearing_degs is None or pitch_degs is None:
             return None
 
+        # accel_north = self.accel_x * math.cos(deg2rad(pitch_degs)) * \
+        #     math.sin(deg2rad(90 - bearing_degs))
+        # accel_west = -self.accel_x * math.cos(deg2rad(pitch_degs)) * math.cos(deg2rad(90 - bearing_degs))
+        # accel_z = self.accel_x * math.sin(deg2rad(pitch_degs))
         accel_north = self.accel_x * math.cos(deg2rad(pitch_degs)) * \
-            math.sin(deg2rad(90 - bearing_degs))
-        accel_west = -self.accel_x * math.cos(deg2rad(pitch_degs)) * math.cos(deg2rad(90 - bearing_degs))
+            math.cos(deg2rad(bearing_degs))
+        accel_west = -(self.accel_x * math.cos(deg2rad(pitch_degs)) * math.sin(deg2rad(bearing_degs)))
         accel_z = self.accel_x * math.sin(deg2rad(pitch_degs))
         return Acceleration(accel_north, accel_west, accel_z)
 
@@ -55,8 +59,8 @@ class RawVelSensor(ABC):
         if self.vel_raw < 0:
             return None
 
-        vel_north = self.vel_raw * math.sin(deg2rad(90 - bearing_degs))
-        vel_west = -self.vel_raw * math.cos(deg2rad(90 - bearing_degs))
+        vel_north = self.vel_raw * math.cos(deg2rad(bearing_degs))
+        vel_west = -(self.vel_raw * math.sin(deg2rad(bearing_degs)))
         return Velocity2D(vel_north, vel_west)
 
 
