@@ -36,7 +36,8 @@ class Simulator:
         self.timesteps = 0
 
     def recordTruth(self):
-        with open(os.path.join('onboard', 'filter', 'logs', 'truthLog.csv'), mode=self.CSV_MODE) as log:
+        with open(os.path.join('onboard', 'filter', 'logs', 'truthLog.csv'), mode=self.CSV_MODE)\
+                as log:
             writer = csv.writer(log)
             writer.writerow(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing', 'speed'])
             for i in range(len(self.truth['gps_north'])):

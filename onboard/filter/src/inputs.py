@@ -26,13 +26,10 @@ class RawAccelSensor(ABC):
         if self.accel_x is None or bearing_degs is None or pitch_degs is None:
             return None
 
-        # accel_north = self.accel_x * math.cos(deg2rad(pitch_degs)) * \
-        #     math.sin(deg2rad(90 - bearing_degs))
-        # accel_west = -self.accel_x * math.cos(deg2rad(pitch_degs)) * math.cos(deg2rad(90 - bearing_degs))
-        # accel_z = self.accel_x * math.sin(deg2rad(pitch_degs))
         accel_north = self.accel_x * math.cos(deg2rad(pitch_degs)) * \
             math.cos(deg2rad(bearing_degs))
-        accel_west = -(self.accel_x * math.cos(deg2rad(pitch_degs)) * math.sin(deg2rad(bearing_degs)))
+        accel_west = -(self.accel_x * math.cos(deg2rad(pitch_degs)) *
+                       math.sin(deg2rad(bearing_degs)))
         accel_z = self.accel_x * math.sin(deg2rad(pitch_degs))
         return Acceleration(accel_north, accel_west, accel_z)
 
