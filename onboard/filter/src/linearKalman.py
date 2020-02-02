@@ -65,9 +65,8 @@ class LinearKalman:
                              [0., 0.5*dt**2.],
                              [0., dt]])
 
-        # self.kf.H = np.eye(4)
-        # TODO remove velocity?
-        self.kf.H = np.diag([1, 0, 1, 0])
+        self.kf.H = np.eye(4)
+        # self.kf.H = np.diag([1, 0, 1, 0])
 
         # calculate process noise
         Q_lat = Q_discrete_white_noise(dim=2, dt=dt,
@@ -81,7 +80,6 @@ class LinearKalman:
     def run(self, gps, imu, state_estimate):
         # predicts forward given sensors
         # returns new state
-        # TODO remove velocity?
 
         measured_pos = gps.asDecimal()
 
@@ -91,7 +89,7 @@ class LinearKalman:
 
         measured_accel = imu.absolutifyAccel(imu.bearing_degs, imu.pitch_degs)
         measured_accel.north = meters2lat(measured_accel.north)
-        measured_accel.west = meters2long(measured_accel.west, measured_accel
+        measured_accel.west = meters2long(measured_accel.west, measured_pos.lat_deg)
 
         u = [measured_accel.north, measured_accel.west]
 

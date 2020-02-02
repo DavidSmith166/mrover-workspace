@@ -1,7 +1,7 @@
 {
     "COMMENT" : "ALL VALUES IN METERS",
 
-    "Q": 0.07,
+    "Q": 0.06,
 
     "FilterType": "LinearKalman",
 

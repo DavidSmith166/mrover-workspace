@@ -92,9 +92,10 @@ class Plotter:
 
         # Plot
         plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
-        plot.plot(range(0, self.data.shape[0], 1), self.data['bearing'])
-        plot.axis([0, self.data.shape[0], np.amin(self.data['bearing']),
-                  np.amax(self.data['bearing'])])
+        shifted_bearing = np.array([i - 360 if i > 180 else i for i in self.data['bearing']])
+        plot.plot(range(0, self.data.shape[0], 1), shifted_bearing)
+        plot.axis([0, self.data.shape[0], np.amin(shifted_bearing),
+                  np.amax(shifted_bearing)])
         plot.xlabel('Time (seconds)')
         plot.ylabel('Bearing (degrees)')
         plot.title('Bearing')

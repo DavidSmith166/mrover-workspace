@@ -22,7 +22,6 @@ filtered path from truth
 
 
 class PathGenerator:
-    # TODO retain prev path
 
     def __init__(self):
         # Fetch constants
@@ -61,88 +60,58 @@ class PathGenerator:
 
     # generates angles in degrees
     def angleGen(self, delta, initial=None, _min=None, _max=None):
-        # TODO integrate min max with mod math
         if initial is None:
-            last_angle = random.uniform(0, 360)
+            if _min is None or _max is None:
+                last_angle = random.uniform(0, 360)
+            else:
+                last_angle = random.uniform(_min, _max)
         else:
             last_angle = initial
         num_angles = 1
-        yield np.float64(last_angle)
+        yield np.float64(last_angle % 360)
         while num_angles < self.MAX_READINGS:
-            new_angle = random.uniform(max((last_angle - delta), _min),
-                                       min((last_angle + delta), _max))
-            new_angle %= 360
-            num_angles += 1
-            last_angle = new_angle
-            yield np.float64(new_angle)
-
-    # generates angles in degrees
-    def tempGen(self, delta):
-        last_angle = 0
-        num_angles = 1
-        yield np.float64(last_angle)
-        while num_angles < self.MAX_READINGS:
-            if num_angles < self.MAX_READINGS / 2:
-                new_angle = 0
+            if _min is None or _max is None:
+                new_angle = random.uniform(last_angle - delta,
+                                           last_angle + delta)
             else:
-                new_angle = 90
+                new_angle = random.uniform(max((last_angle - delta), _min),
+                                           min((last_angle + delta), _max))
             num_angles += 1
+
             last_angle = new_angle
-            yield np.float64(new_angle)
-
-    def tempGen2(self):
-        while True:
-            yield 0
-
-    def tempGen3(self):
-        while True:
-            yield 0.1
+            yield np.float64(new_angle % 360)
 
     # generates a true path (m/s)
     def generateTruth(self):
 
         # generate control inputs
-        # accel_points_x = np.fromiter(self.pointGen(), np.float64, count=self.MAX_READINGS)
-        accel_points_x = np.fromiter(self.tempGen3(), np.float64, count=self.MAX_READINGS)
-        # bearing_angles_degs = np.fromiter(self.angleGen(self.MAX_ROT_VEL_DEGS), np.float64,
-        #                                   count=self.MAX_READINGS)
-        bearing_angles_degs = np.fromiter(self.tempGen(self.MAX_ROT_VEL_DEGS), np.float64,
-                                          count=self.MAX_READINGS)
-        # pitch_angles_degs = np.fromiter(self.angleGen(self.MAX_PITCH_VEL_DEGS, initial=0, _min=-60, _max=60),
-        #                                 np.float64, count=self.MAX_READINGS)
-        pitch_angles_degs = np.fromiter(self.tempGen2(),
-                                        np.float64, count=self.MAX_READINGS)
+        accel_points_x = np.fromiter(self.pointGen(), np.float64, count=self.MAX_READINGS)
 
-        # debug
-        neg_count = 0
-        out_count = 0
-        for i in pitch_angles_degs:
-            if math.cos(deg2rad(i)) < 0:
-                neg_count += 1
-            if not i <= 60 or i >= 300:
-                out_count += 1
-        print(neg_count)
-        print(out_count)
+        bearing_angles_degs = np.fromiter(self.angleGen(self.MAX_ROT_VEL_DEGS), np.float64,
+                                          count=self.MAX_READINGS-1)
+        pitch_angles_degs = np.fromiter(self.angleGen(self.MAX_PITCH_VEL_DEGS, _min=-60, _max=60),
+                                        np.float64, count=self.MAX_READINGS-1)
 
-        # generate absolute accelerations
+        # create sin cos arrays for absolutification
         bearing_cos = [math.cos(deg2rad(i)) for i in bearing_angles_degs]
         bearing_sin = [math.sin(deg2rad(i)) for i in bearing_angles_degs]
         pitch_cos = [math.cos(deg2rad(i)) for i in pitch_angles_degs]
-        accel_points_north = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_cos))
-        accel_points_west = -(np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_sin)))
 
-        # generate derivatives
-        vel_points_north = scipy.integrate.cumtrapz(accel_points_north, dx=self.DT_S)
-        vel_points_west = scipy.integrate.cumtrapz(accel_points_west, dx=self.DT_S)
-        vel_points_total = np.array([math.sqrt(vel_points_north[i]**2 + vel_points_west[i]**2)
-                                     for i in range(len(vel_points_north))])
+        # generate absolute accelerations
+        # accel_points_north = np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_cos))
+        # accel_points_west = -(np.multiply(accel_points_x, np.multiply(pitch_cos, bearing_sin)))
+
+        # generate velocities
+        vel_points_x = scipy.integrate.cumtrapz(accel_points_x, dx=self.DT_S)
+        vel_points_north = np.multiply(vel_points_x, np.multiply(pitch_cos, bearing_cos))
+        vel_points_west = -(np.multiply(vel_points_x, np.multiply(pitch_cos, bearing_sin)))
 
         gps_points_north = scipy.integrate.cumtrapz(vel_points_north, dx=self.DT_S)
         gps_points_north = meters2lat(gps_points_north)
         gps_points_west = scipy.integrate.cumtrapz(vel_points_west, dx=self.DT_S)
         gps_points_west = meters2long(gps_points_west, gps_points_north)
-        gps_points_north = [i + 42.277 for i in gps_points_north]
-        gps_points_west = [i + 83.7382 for i in gps_points_west]
+        # gps_points_north = [i + 42.277 for i in gps_points_north]
+        # gps_points_west = [i + 83.7382 for i in gps_points_west]
 
         return {
             "accel_x": accel_points_x,
@@ -150,7 +119,7 @@ class PathGenerator:
             "accel_z": np.zeros(self.MAX_READINGS),
             "vel_north": vel_points_north,
             "vel_west": vel_points_west,
-            "vel_total": vel_points_total,
+            "vel_total": vel_points_x,
             "gps_north": gps_points_north,
             "gps_west": gps_points_west,
             "bearing": bearing_angles_degs,
