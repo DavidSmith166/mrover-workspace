@@ -66,7 +66,8 @@ class Logger:
     def write(self, contents, type):
         # Writes contents to the log specified by type
         # with open(self.file_path + type + 'Log.csv', 'w') as log:
-        with open(os.path.join('onboard', 'filter', 'logs', type + 'Log.csv'), mode=self.logConfig['mode']) as log:
+        with open(os.path.join('onboard', 'filter', 'logs', type + 'Log.csv'),
+                  mode=self.logConfig['mode']) as log:
             writer = csv.writer(log)
             writer.writerow(contents)
 

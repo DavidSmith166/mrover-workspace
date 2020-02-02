@@ -30,7 +30,8 @@ class PathGenerator:
         with open(config_path, "r") as configJson:
             config = json.load(configJson)
             self.DT_S = config['dt_s']
-            self.GPS_POS_STDEV_METERS = config['gps_pos_stdev_meters']
+            self.GPS_LAT_STDEV_METERS = config['gps_lat_stdev_meters']
+            self.GPS_LONG_STDEV_METERS = config['gps_long_stdev_meters']
             self.GPS_VEL_STDEV_METERS = config['gps_vel_stdev_meters']
             self.GPS_BEARING_STDEV_DEGS = config['gps_bearing_stdev_degs']
             self.IMU_ACCEL_STDEV_METERS = config['imu_accel_stdev_meters']
@@ -130,16 +131,18 @@ class PathGenerator:
     def applyNoise(self, truth):
 
         noisy_accel_points_x = np.random.normal(truth['accel_x'], self.IMU_ACCEL_STDEV_METERS)
-        noisy_accel_points_y = np.random.normal(np.zeros(self.MAX_READINGS), self.IMU_ACCEL_STDEV_METERS)
-        noisy_accel_points_z = np.random.normal(np.zeros(self.MAX_READINGS), self.IMU_ACCEL_STDEV_METERS)
+        noisy_accel_points_y = np.random.normal(np.zeros(self.MAX_READINGS),
+                                                self.IMU_ACCEL_STDEV_METERS)
+        noisy_accel_points_z = np.random.normal(np.zeros(self.MAX_READINGS),
+                                                self.IMU_ACCEL_STDEV_METERS)
 
         noisy_vel_points_total = np.random.normal(truth['vel_total'], self.GPS_VEL_STDEV_METERS)
 
         noisy_gps_points_north = np.random.normal(truth['gps_north'],
-                                                  meters2lat(self.GPS_POS_STDEV_METERS))
+                                                  meters2lat(self.GPS_LAT_STDEV_METERS))
         noisy_gps_points_west = np.random.normal(truth['gps_west'],
                                                  [abs(i) for i in
-                                                  meters2long(self.GPS_POS_STDEV_METERS,
+                                                  meters2long(self.GPS_LONG_STDEV_METERS,
                                                               truth['gps_north'])])
 
         noisy_bearing_angles_degs = np.random.normal(truth['bearing'], self.IMU_BEARING_STDEV_DEGS)

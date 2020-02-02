@@ -142,6 +142,7 @@ class Plotter:
             self.plotBearing([2, 2, 4])
         elif data_type == 'filterSim':
             self.readCsv('gps', float, True)
+            gps = self.data
             self.plotPath('red', 'gps', [1, 1, 1])
             self.readCsv('truth', float, True)
             self.plotPath('black', 'truth', [1, 1, 1])

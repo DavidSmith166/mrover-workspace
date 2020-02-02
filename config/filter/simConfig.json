@@ -1,5 +1,6 @@
 {
-    "gps_pos_stdev_meters" : 1,
+    "gps_lat_stdev_meters" : 1,
+    "gps_long_stdev_meters" : 1.8,
     "gps_vel_stdev_meters" : 0.04,
     "gps_bearing_stdev_degs" : 10,
     "gps_update_rate_millis" : 50,
