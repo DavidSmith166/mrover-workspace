@@ -28,10 +28,10 @@ class RawAccelSensor(ABC):
 
         accel_north = self.accel_x * math.cos(deg2rad(pitch_degs)) * \
             math.cos(deg2rad(bearing_degs))
-        accel_west = -(self.accel_x * math.cos(deg2rad(pitch_degs)) *
-                       math.sin(deg2rad(bearing_degs)))
+        accel_east = self.accel_x * math.cos(deg2rad(pitch_degs)) * \
+            math.sin(deg2rad(bearing_degs))
         accel_z = self.accel_x * math.sin(deg2rad(pitch_degs))
-        return Acceleration(accel_north, accel_west, accel_z)
+        return Acceleration(accel_north, accel_east, accel_z)
 
 
 class RawVelSensor(ABC):
@@ -57,8 +57,8 @@ class RawVelSensor(ABC):
             return None
 
         vel_north = self.vel_raw * math.cos(deg2rad(bearing_degs))
-        vel_west = -(self.vel_raw * math.sin(deg2rad(bearing_degs)))
-        return Velocity2D(vel_north, vel_west)
+        vel_east = self.vel_raw * math.sin(deg2rad(bearing_degs))
+        return Velocity2D(vel_north, vel_east)
 
 
 class RawPosSensor(ABC):
@@ -189,20 +189,20 @@ class RawPhone(RawPosSensor, RawBearingSensor):
 
 class Acceleration:
     # Class for absolute acceleration
-    def __init__(self, north, west, z):
+    def __init__(self, north, east, z):
         self.north = north
-        self.west = west
+        self.east = east
         self.z = z
 
 
 class Velocity2D:
     # Class for absolute velocity
-    def __init__(self, north, west):
+    def __init__(self, north, east):
         self.north = north
-        self.west = west
+        self.east = east
 
     def pythagorean(self):
-        return math.sqrt(self.north**2 + self.west**2)
+        return math.sqrt(self.north**2 + self.east**2)
 
 
 class PositionDegs:

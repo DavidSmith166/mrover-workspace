@@ -85,16 +85,16 @@ class LinearKalman:
 
         measured_vel = gps.absolutifyVel(imu.bearing_degs)
         measured_vel.north = meters2lat(measured_vel.north)
-        measured_vel.west = meters2long(measured_vel.west, measured_pos.lat_deg)
+        measured_vel.east = meters2long(measured_vel.east, measured_pos.lat_deg)
 
         measured_accel = imu.absolutifyAccel(imu.bearing_degs, imu.pitch_degs)
         measured_accel.north = meters2lat(measured_accel.north)
-        measured_accel.west = meters2long(measured_accel.west, measured_pos.lat_deg)
+        measured_accel.east = meters2long(measured_accel.east, measured_pos.lat_deg)
 
-        u = [measured_accel.north, measured_accel.west]
+        u = [measured_accel.north, measured_accel.east]
 
         z = [measured_pos.lat_deg, measured_vel.north,
-             measured_pos.long_deg, measured_vel.west]
+             measured_pos.long_deg, measured_vel.east]
 
         self.kf.predict(np.array(u))
         self.kf.update(np.array(z))

@@ -43,7 +43,7 @@ def ensure_lcm(ctx):
         ctx.run("cp -r {}/* .".format(lcmdir))  # TODO: Use python's own cp
         print("Configuring LCM...")
         ctx.run("./bootstrap.sh", hide='both')
-        ctx.run("./configure --prefix={}".format(ctx.product_env), hide='both')
+        ctx.run("./configure --prefix={} --without-java".format(ctx.product_env), hide='both')
         print("Building LCM...")
         ctx.run("make", hide='both')
         print("Installing LCM...")
