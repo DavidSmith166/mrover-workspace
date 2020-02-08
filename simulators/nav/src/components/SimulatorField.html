@@ -13,32 +13,32 @@ import {
     to_decimal,
     dist_and_bearing,
     inv_projection as inv_projection_,
-    projection as projection_
+    projection as projection_,
+    compass_to_computer
 } from "../geography.js";
 import { WAYPOINT_MODE, ROCK_MODE, AR_TAG_MODE, GATE_MODE } from "../constants.js";
 import _ from 'lodash';
 
 const EARTH_RAD = 6371000.0;
 // const ROVER_SIZE = 25;
-const ROVER_SIZE_M = 1;
+const ROVER_SIZE_M = 1; // meters
 // const VECTOR_SIZE = 20;
-const VECTOR_SIZE_M = .75;
+const VECTOR_SIZE_M = .75; // meters
 const WAYPOINT_SIZE = 10;
 const TENNIS_BALL_SIZE = 4;
 // const ROCK_SIZE = 25;
-const ROCK_SIZE_M = 1.2;
-const ROVER_FIELD_OF_VIEW = 2*Math.PI/3;
-const ROVER_DEPTH_OF_VIEW = 10;
-const CV_DEPTH = 5;
-
-const TRANSLATIONAL_SCALE = 1;
-const ROTATIONAL_SCALE = 2;
+const ROCK_SIZE_M = 1.2; // meters
+const POST_BLOCKING_ANGLE = 15 * Math.PI/180; // A post behind another post must be at least 15 degrees offset to be visible
 
 function ensure_in_range(x, min, max) {
     return Math.max(Math.min(x, max), min);
 }
 
 export default {
+    computed: {
+        field_of_view_rad: (field_of_view) => field_of_view * Math.PI / 180,
+    },
+
     data() {
         return {
             center_lat: 39.4,
@@ -94,12 +94,14 @@ export default {
                 {
                     detected: false,
                     distance: -1,
-                    bearing: 0
+                    bearing: 0,
+                    id: -1
                 },
                 {
                     detected: false,
                     distance: -1,
-                    bearing: 0
+                    bearing: 0,
+                    id: -1
                 }
             ];
 
@@ -111,7 +113,7 @@ export default {
                     to_decimal(odom), to_decimal(tag));
                 const rover_bearing = odom.bearing_deg * Math.PI/180;
 
-                if (Math.abs(bearing - rover_bearing) < ROVER_FIELD_OF_VIEW/2 && dist < ROVER_DEPTH_OF_VIEW) {
+                if (Math.abs(bearing - rover_bearing) < this.get('field_of_view_rad')/2 && dist < this.get('depth_of_view')) {
                     tag.detected = true;
                     tag_detected_idx = i;
                     ar_tag_state[0] = {
@@ -132,60 +134,98 @@ export default {
             if (!odom) { return; }
             let gates = this.get("gates");
 
-            let gate_detected_idx = -1;
+            // by default we have seen no gates
             let ar_tag_state = [
                 {
                     detected: false,
                     distance: -1,
-                    bearing: 0
+                    bearing: 0,
+                    id: -1
                 },
                 {
                     detected: false,
                     distance: -1,
-                    bearing: 0
+                    bearing: 0,
+                    id: -1
                 }
             ];
 
+            // check to see if any gates are within the our view
             for (let i = 0; i < gates.length; i++) {
-
                 gates[i][0].detected = false;
                 gates[i][1].detected = false;
 
                 const rover_bearing = odom.bearing_deg * Math.PI/180;
 
-                const { dist:dist, bearing:bearing } = dist_and_bearing(
+                // find dist and bearing to first post in gate i
+                let { dist:post1_dist, bearing:post1_bearing } = dist_and_bearing(
                     to_decimal(odom), to_decimal(gates[i][0]));
 
-                const { dist:dist1, bearing:bearing_1 } = dist_and_bearing(
+                // find dist and bearing to second post in gate i
+                let { dist:post2_dist, bearing:post2_bearing } = dist_and_bearing(
                     to_decimal(odom), to_decimal(gates[i][1]));
 
-                if ((dist1) < (dist)) {
-                    let post = gates[i][0];
+                // put the closer post in the first position in gates[i]
+                if (post2_dist < post1_dist) {
+                    const post = gates[i][0];
                     gates[i][0] = gates[i][1];
                     gates[i][1] = post;
+
+                    const dist = post1_dist;
+                    post1_dist = post2_dist;
+                    post2_dist = dist;
+
+                    const bear = post1_bearing;
+                    post1_bearing = post2_bearing;
+                    post2_bearing = bear;
                 }
 
-                if (Math.abs(bearing - rover_bearing) < ROVER_FIELD_OF_VIEW/2 && dist < ROVER_DEPTH_OF_VIEW) {
+                // Check if the close post is visible (withing field of view and close enough)
+                if (Math.abs(this.calc_rel_bearing(rover_bearing, post1_bearing)) < this.get('field_of_view_rad')/2 &&
+                        post1_dist < this.get('depth_of_view')) {
                     gates[i][0].detected = true;
-                    gate_detected_idx = i;
 
                     ar_tag_state[0] = {
-                        distance: dist,
-                        bearing: (bearing - rover_bearing) * 180/Math.PI
+                        distance: post1_dist,
+                        bearing: this.calc_rel_bearing(rover_bearing, post1_bearing) * 180/Math.PI
                     };
                 }
 
-                if (Math.abs(bearing_1 - rover_bearing) < ROVER_FIELD_OF_VIEW/2 && dist1 < ROVER_DEPTH_OF_VIEW) {
+                // Check if the far post is visible (withing field of view, close enough, and not blocked by the first post)
+                if (Math.abs(this.calc_rel_bearing(rover_bearing, post2_bearing)) < this.get('field_of_view_rad')/2 &&
+                        post2_dist < this.get('depth_of_view') &&
+                        Math.abs(this.calc_rel_bearing(post2_bearing, post1_bearing)) > POST_BLOCKING_ANGLE) {
                     gates[i][1].detected = true;
 
                     ar_tag_state[1] = {
-                        distance: dist1,
-                        bearing: (bearing_1 - rover_bearing) * 180/Math.PI
+                        distance: post2_dist,
+                        bearing: this.calc_rel_bearing(rover_bearing, post2_bearing) * 180/Math.PI
                     };
                 }
 
-                if (gate_detected_idx != -1)
-                    break;
+                // If neither post is visible, move on to checking the next gate
+                if (!gates[i][0].detected && !gates[i][1].detected) {
+                    continue;
+                }
+
+                // Swap the order of the posts in ar_tag_state
+                // Case 1: If only the second post is visible because the
+                //         visible post should be in the first position the
+                //         target list lcm
+                // Case 2: If both posts are visible and the left post is in
+                //         the seond position because we need the left to
+                //         appear first in the target list lcm
+                if (!gates[i][0].detected ||
+                    (gates[i][1].detected && this.calc_rel_bearing(rover_bearing, post2_bearing) <
+                                             this.calc_rel_bearing(rover_bearing, post1_bearing))) {
+                    const post = ar_tag_state[0];
+                    ar_tag_state[0] = ar_tag_state[1];
+                    ar_tag_state[1] = post;
+                }
+
+                // After finding the first gate, don't bother looking for
+                // any others because we only send one to Nav.
+                break;
             }
             this.set({ ar_tag_state, gates });
         };
@@ -200,33 +240,6 @@ export default {
             const b2 = sign(point, coords, {x: crossbar.x1, y: crossbar.y1}) < 0;
 
             return (b0 == b1) && (b1 == b2);
-        };
-
-        const get_triangle = (scale, odom) => {
-            // const rock_radius = ROCK_SIZE/scale;
-            const rock_radius = ROCK_SIZE_M;
-            const coords = this.projection(to_decimal(odom));
-            // const root_2 = Math.sqrt(2);
-            const h =  rock_radius * Math.sin(Math.PI - ROVER_FIELD_OF_VIEW) / Math.sin(ROVER_FIELD_OF_VIEW / 2);
-            const theta_r = odom.bearing_deg * Math.PI / 180;
-            const x_0 = coords.x - h * Math.sin(theta_r); // switched sign
-            const y_0 = coords.y - h * Math.cos(theta_r); // switched sign
-            const x_c = coords.x + (CV_DEPTH + rock_radius) * Math.sin(theta_r);
-            const y_c = coords.y + (CV_DEPTH + rock_radius) * Math.cos(theta_r);
-            // d = smaller triangle d + extension
-            let d = CV_DEPTH * Math.tan(ROVER_FIELD_OF_VIEW / 2);
-            const alpha = (180 - ROVER_FIELD_OF_VIEW) / 2;
-            const h_prime = rock_radius * Math.sin(Math.PI - alpha) / Math.sin(alpha / 2);
-            const delta_d = Math.sqrt(h_prime * h_prime - rock_radius * rock_radius);
-            d += delta_d;
-            const crossbar = {
-                x1: x_c - d * Math.cos(theta_r),
-                y1: y_c + d * Math.sin(theta_r),
-                x2: x_c + d * Math.cos(theta_r),
-                y2: y_c - d * Math.sin(theta_r)
-            };
-
-            return { x_0, y_0, crossbar, x_c, y_c };
         };
 
         const find_occupied = (odom, rcoords, occupied_angles, rock_radius) => {
@@ -262,21 +275,23 @@ export default {
                 alpha = 90 - beta;
             } // x-axis
 
-            const phi_1 = alpha - gamma + ROVER_FIELD_OF_VIEW / 2 * 180 / Math.PI;
-            const phi_2 = alpha + gamma + ROVER_FIELD_OF_VIEW / 2 * 180 / Math.PI;
+            const phi_1 = alpha - gamma + this.get('field_of_view_rad') / 2 * 180 / Math.PI;
+            const phi_2 = alpha + gamma + this.get('field_of_view_rad') / 2 * 180 / Math.PI;
             occupied_angles.fill(true, phi_1, phi_2);
         };
 
         const recompute_obstacle_visibility = () => {
             const odom = this.get("odom");
-            const scale = this.get("radius_meters");
             if (!odom) { return; }
             let rocks = this.get("rocks");
-            const {x_0, y_0, crossbar} = get_triangle(scale, odom);
             // Filter out objects outside the "larger triangle"
             const filtered_rocks = _.filter(rocks, (rock) => {
-                const rcoords = this.projection(to_decimal(rock));
-                return point_in_triangle(rcoords, crossbar, {x: x_0, y: y_0});
+                const { dist, bearing } = dist_and_bearing(to_decimal(odom), to_decimal(rock));
+                let bear_to_rock = Math.abs(bearing - odom.bearing_deg * Math.PI/180);
+                if (bear_to_rock > 180) {
+                    bear_to_rock = 2 * Math.PI - bear_to_rock;
+                }
+                return dist - ROCK_SIZE_M <= this.get('depth_of_view') && bear_to_rock <= this.get('field_of_view_rad');
             });
 
             let occupied_angles = new Array(120);
@@ -288,7 +303,7 @@ export default {
             // can we move straight ahead
             const rover_width = ROVER_SIZE_M;
             let path_clear = true;
-            const clearance_angle = Math.atan2(rover_width, CV_DEPTH) * 180 / Math.PI;
+            const clearance_angle = Math.atan2(rover_width, this.get('depth_of_view')) * 180 / Math.PI;
             for (let i = 60 - clearance_angle|0; i < 60 + clearance_angle|0; ++i) {
                 if (occupied_angles[i]) path_clear = false;
             }
@@ -336,22 +351,63 @@ export default {
 
         };
 
-        const draw_triangle = (odom) => {
-            // TODO temporary debug code
-            const {x_0, y_0, crossbar, x_c, y_c} = get_triangle(this.get("radius_meters"), odom);
-            const va = this.to_canvas({x: x_0, y: y_0});
-            const vb = this.to_canvas({x: crossbar.x1, y: crossbar.y1});
-            const vc = this.to_canvas({x: crossbar.x2, y: crossbar.y2});
-            const center = this.to_canvas({x: x_c, y: y_c});
+        const draw_visibility = (odom) => {
+            const rover_loc = this.projection(to_decimal(odom));
+            const depth = this.get('depth_of_view')
+            const scale = canvas.width/(2*this.get('radius_meters'));
+            const bearing_rad = compass_to_computer(odom.bearing_deg * Math.PI / 180);
+            const half_fov = this.get('field_of_view_rad') / 2;
+            const center_vert = this.to_canvas(rover_loc);
+            const left_angle = bearing_rad - half_fov;
+            const right_angle = bearing_rad + half_fov;
+            const left_vert = this.to_canvas({
+                x: rover_loc.x + Math.cos(left_angle) * depth,
+                y: rover_loc.y - Math.sin(left_angle) * depth
+            });
+            const right_vert = this.to_canvas({
+                x: rover_loc.x + Math.cos(right_angle) * depth,
+                y: rover_loc.y - Math.sin(right_angle) * depth
+            });
 
-            ctx.strokeStyle = 'lightblue';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(va.x, va.y);
-            ctx.lineTo(vb.x, vb.y);
-            ctx.lineTo(vc.x, vc.y);
-            ctx.lineTo(va.x, va.y);
-            // ctx.lineTo(center.x, center.y);
+            ctx.moveTo(right_vert.x, right_vert.y);
+            ctx.lineTo(center_vert.x, center_vert.y);
+            ctx.lineTo(left_vert.x, left_vert.y);
+            ctx.arc(center_vert.x, center_vert.y, depth * scale, left_angle, right_angle);
+            ctx.stroke();
+        };
+
+        // Draw arrow indicating directionality of a gate.
+        const draw_gate_direction_arrow = (tip_loc, posts) => {
+            let { dist:_, bearing:angle } = dist_and_bearing(to_decimal(posts[0]), to_decimal(posts[1]));
+            // Angle should be 90 degrees offset from angle between posts.
+            angle -= Math.PI / 2;
+            // If left post is odd, flip the arrow 180 degrees
+            if (posts[1].id % 2) {
+                angle += Math.PI;
+            }
+            angle %= 2 * Math.PI;
+            // Convert angle from compass to simulator field angle.
+            angle = compass_to_computer(angle);
+
+            // Draw lines to make arrow.
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            // main line
+            const arrow_len = 20;
+            ctx.moveTo(tip_loc.x, tip_loc.y);
+            ctx.lineTo(tip_loc.x + arrow_len * Math.cos(angle), tip_loc.y - arrow_len * Math.sin(angle));
+            // arrow head first half
+            angle += Math.PI / 4;
+            ctx.moveTo(tip_loc.x, tip_loc.y);
+            ctx.lineTo(tip_loc.x + arrow_len / 2 * Math.cos(angle), tip_loc.y - arrow_len / 2 * Math.sin(angle));
+            // arrow head second half
+            angle -= Math.PI / 2;
+            ctx.moveTo(tip_loc.x, tip_loc.y);
+            ctx.lineTo(tip_loc.x + arrow_len / 2 * Math.cos(angle), tip_loc.y - arrow_len / 2 * Math.sin(angle));
             ctx.stroke();
         };
 
@@ -387,9 +443,11 @@ export default {
                        coords.y - VECTOR_SIZE_M*y_scale*Math.sin(bearing));
             ctx.stroke();
 
-            // Uncomment this code in to draw the rover's triangle of visibility
-            // draw_triangle(odom);
+            if (this.get('field_of_view_visible')) {
+                draw_visibility(odom);
+            }
 
+            // Draw waypoints
             for (let i = 0; i < waypoints.length; i++) {
                 const waypoint = waypoints[i];
                 const way_coords = this.to_canvas(this.projection(to_decimal(waypoint)));
@@ -409,11 +467,12 @@ export default {
                 ctx.fillText(`${i}`, way_coords.x + text_offset, way_coords.y - text_offset);
             }
 
+            // Draw targets
             for (let i = 0; i < ar_tags.length; i++) {
                 const tag = ar_tags[i][0];
                 const target_coords = this.to_canvas(this.projection(to_decimal(tag)));
 
-                ctx.fillStyle = 'lightgreen';
+                ctx.fillStyle = 'violet';
                 ctx.strokeStyle = 'black';
                 ctx.lineWidth = 1;
 
@@ -431,62 +490,66 @@ export default {
                 ctx.stroke();
                 ctx.closePath();
 
+                // Label with ID of target
                 const text_offset = 5;
                 ctx.fillStyle = 'black';
-                ctx.fillText(`${i}`, target_coords.x + text_offset, target_coords.y - text_offset);
+                ctx.fillText(`${tag.id}`, target_coords.x + text_offset, target_coords.y - text_offset);
             }
 
+            // Draw gates
             for (let i = 0; i < gates.length; i++) {
                 const posts = gates[i];
-                const gate_coords_1 = this.to_canvas(this.projection(to_decimal(posts[0])));
-
-                ctx.fillStyle = 'lightblue';
                 ctx.strokeStyle = 'black';
                 ctx.lineWidth = 1;
-
                 const bearing = 0;
                 const side = 12;
                 const h = side * (Math.sqrt(3)/2);
 
-                ctx.beginPath();
-                ctx.moveTo(gate_coords_1.x, -h / 2 + gate_coords_1.y);
-                ctx.lineTo( -side / 2 + gate_coords_1.x , h / 2 + gate_coords_1.y);
-                ctx.lineTo(side / 2 + gate_coords_1.x, h / 2 + gate_coords_1.y);
-                ctx.lineTo(gate_coords_1.x, -h / 2 + gate_coords_1.y);
+                let arrow_coords = {x: 0, y: 0};
 
-                ctx.fill();
-                ctx.stroke();
-                ctx.closePath();
+                for( let j = 0; j < 2; j++ ) {
+                    const gate_coords = this.to_canvas(this.projection(to_decimal(posts[j])));
+                    arrow_coords.x += gate_coords.x;
+                    arrow_coords.y += gate_coords.y;
 
-                const gate_coords_2 = this.to_canvas(this.projection(to_decimal(posts[1])));
+                    const bearing = 0;
+                    const side = 12;
+                    const h = side * (Math.sqrt(3)/2);
 
-                ctx.fillStyle = 'yellow';
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 1;
+                    if (posts[j].id % 2) {
+                        ctx.fillStyle = 'yellow';
+                    } else  {
+                        ctx.fillStyle = 'lightblue';
+                    }
+                    ctx.beginPath();
+                    ctx.moveTo(gate_coords.x, -h / 2 + gate_coords.y);
+                    ctx.lineTo( -side / 2 + gate_coords.x , h / 2 + gate_coords.y);
+                    ctx.lineTo(side / 2 + gate_coords.x, h / 2 + gate_coords.y);
+                    ctx.lineTo(gate_coords.x, -h / 2 + gate_coords.y);
 
-                ctx.beginPath();
-                ctx.moveTo(gate_coords_2.x, -h / 2 + gate_coords_2.y);
-                ctx.lineTo( -side / 2 + gate_coords_2.x , h / 2 + gate_coords_2.y);
-                ctx.lineTo(side / 2 + gate_coords_2.x, h / 2 + gate_coords_2.y);
-                ctx.lineTo(gate_coords_2.x, -h / 2 + gate_coords_2.y);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.closePath();
 
-                ctx.fill();
-                ctx.stroke();
-                ctx.closePath();
+                    // Label with ID of first
+                    const text_offset = 5;
+                    ctx.fillStyle = 'black';
+                    ctx.fillText(`${posts[j].id}`, gate_coords.x + text_offset, gate_coords.y - text_offset);
+                }
 
-                let gate_coords_c = gate_coords_1;
-                const text_offset = -2;
-                gate_coords_c.x = (gate_coords_1.x + gate_coords_2.x) / 2;
-                gate_coords_c.y = (gate_coords_1.y + gate_coords_2.y) / 2;
-                ctx.fillStyle = 'black';
-                ctx.fillText(`${i}`, gate_coords_c.x + text_offset, gate_coords_c.y - text_offset);
+                // Draw arrow to indicate the correct direction.
+                // Note that this is only based on the even/odd-ness of the first post
+                arrow_coords.x /= 2;
+                arrow_coords.y /= 2;
+                draw_gate_direction_arrow(arrow_coords, posts);
             }
 
+            // Draw rocks
             for (let i = 0; i < rocks.length; i++) {
                 const rock = rocks[i];
                 const rock_coords = this.to_canvas(this.projection(to_decimal(rock)));
 
-                ctx.fillStyle = 'brown';
+                ctx.fillStyle = 'sienna';
                 ctx.beginPath();
                 ctx.arc(
                     rock_coords.x, rock_coords.y,
@@ -496,6 +559,25 @@ export default {
                 const text_offset = -3;
                 ctx.fillStyle = 'white';
                 ctx.fillText(`${i}`, rock_coords.x + text_offset, rock_coords.y - text_offset);
+            }
+
+            // If the radio repeater has been dropped, draw it
+            if (this.get('repeater_dropped')) {
+                const repeater_coords = this.to_canvas(this.projection(to_decimal(this.get('repeater_loc'))));
+                const repeater_size = [10, 5];
+                const repeater_len = 9;
+                ctx.fillStyle = 'black';
+                ctx.fillRect(repeater_coords.x - repeater_size[0]/2,
+                             repeater_coords.y - repeater_size[1]/2,
+                             repeater_size[0], repeater_size[1]);
+                ctx.strokeStyle = 'black';
+                ctx.beginPath();
+                ctx.lineWidth = 1.5;
+                ctx.moveTo(repeater_coords.x, repeater_coords.y);
+                ctx.lineTo(repeater_coords.x + repeater_len * Math.cos(3*Math.PI/8), repeater_coords.y - repeater_len * Math.sin(3*Math.PI/8));
+                ctx.moveTo(repeater_coords.x, repeater_coords.y);
+                ctx.lineTo(repeater_coords.x - repeater_len * Math.cos(3*Math.PI/8), repeater_coords.y - repeater_len * Math.sin(3*Math.PI/8));
+                ctx.stroke();
             }
         };
 
@@ -513,7 +595,12 @@ export default {
             if (draw_mode === WAYPOINT_MODE) {
                 let waypoints = this.get("waypoints");
                 waypoints.push(
-                    Object.assign({}, to_dms({lat, lon}), { search: false }, { gate: false })
+                    Object.assign({},
+                        to_dms({lat, lon}),
+                        { search: false },
+                        { gate: false },
+                        { id: this.get("target1_id") }
+                    )
                 );
 
                 this.set({ waypoints });
@@ -522,6 +609,7 @@ export default {
 
                 let tag1 = to_dms({lat, lon});
                 tag1.detected = false;
+                tag1.id = this.get("target1_id");
                 let tag2 = to_dms({lat, lon});
                 tag2.detected = false;
 
@@ -530,13 +618,16 @@ export default {
                 this.set({ ar_tags });
             } else if (draw_mode === GATE_MODE) {
                 let gates = this.get("gates");
-                let angle = this.get("angle");
+                const angle = this.get("angle");
 
-                let post_1 = to_dms({lat, lon});
-                post_1.detected = false;
+                let post1 = to_dms({lat, lon});
+                post1.detected = false;
+                post1.id = this.get("target1_id");
 
-                let post_2 = this.shift_x_meters({lat, lon}, 3, angle);
-                gates.push([post_1, post_2]);
+                let post2 = this.shift_x_meters({lat, lon}, this.get('gate_width'), angle);
+                post2.id = this.get("target2_id");
+
+                gates.push([post1, post2]);
                 this.set({ gates });
             } else if (draw_mode === ROCK_MODE) {
                 let rocks = this.get("rocks");
@@ -557,6 +648,7 @@ export default {
             draw();
         };
 
+        // Update when the following variables change
         this.observe("odom", update);
         this.observe("waypoints", update);
         this.observe("ar_tags", update);
@@ -564,6 +656,10 @@ export default {
         this.observe("rocks", update);
         this.observe("radius_meters", update);
         this.observe("angle", update);
+        this.observe('repeater_dropped', update);
+        this.observe('field_of_view', update);
+        this.observe('depth_of_view', update);
+        this.observe('field_of_view_visible', update);
 
         update();
     },
@@ -642,7 +738,7 @@ export default {
             let odom = this.get("odom");
             let {x, y} = this.projection(to_decimal(odom));
             let bearing_deg = odom.bearing_deg;
-            bearing_deg += ROTATIONAL_SCALE * stick.left_right;
+            bearing_deg += this.get('rotational_speed') * stick.left_right;
             if (bearing_deg < 0) {
                 bearing_deg += 360;
             }
@@ -652,7 +748,7 @@ export default {
 
             const bearing_rad = (90 - bearing_deg) * Math.PI / 180;
 
-            const vel = TRANSLATIONAL_SCALE * stick.forward_back;
+            const vel = this.get('translational_speed') * stick.forward_back;
 
             x += vel * Math.cos(bearing_rad);
             y += vel * Math.sin(bearing_rad);
@@ -665,7 +761,20 @@ export default {
 
             odom = Object.assign({}, to_dms({lat, lon}), { bearing_deg });
             this.set({ odom });
-        }
+        },
+
+        // Calculate the bearing to an object relative to the rover given
+        // the direction the rover is facing and the absolute bearing between
+        // the rover and the object.
+        calc_rel_bearing: function(rover_bearing, absolute_bearing) {
+            let relative_bearing = absolute_bearing - rover_bearing;
+            if (relative_bearing > Math.PI) {
+                relative_bearing -= 2 * Math.PI;
+            } else if (relative_bearing < -Math.PI) {
+                relative_bearing += 2 * Math.PI;
+            }
+            return relative_bearing;
+        },
     }
 }
 </script>

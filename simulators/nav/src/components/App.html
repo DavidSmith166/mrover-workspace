@@ -8,20 +8,60 @@
             bind:gates
             bind:rocks
             bind:angle
+            bind:target1_id
+            bind:target2_id
             bind:ar_tag_state
             bind:obstacle_state
             radius_meters="{{radius}}"
-            mode="{{draw_mode}}"/>
+            mode="{{draw_mode}}"
+            bind:repeater_dropped
+            bind:repeater_loc
+            bind:translational_speed
+            bind:rotational_speed
+            bind:gate_width
+            bind:field_of_view
+            bind:depth_of_view
+            bind:field_of_view_visible/>
     </div>
 
     <div id="drawmode">
-        <DrawModeSelector bind:mode="draw_mode"/>
-        {{#if draw_mode == 3}} <!-- GATE_MODE -->
-            <p><label>
-                Gate Angle (degrees):
-                <input type="number" bind:value="angle"/>
-            </label></p>
-        {{/if}}
+        <div id="sim-field-btns">
+            <DrawModeModule
+                bind:mode="draw_mode"
+                bind:angle
+                bind:target1_id
+                bind:target2_id
+                bind:gate_width/>
+            <DebugTools bind:enabled
+                        bind:odom
+                        bind:paused
+                        bind:take_step
+                        bind:translational_speed
+                        bind:rotational_speed
+                        bind:waypoints
+                        bind:ar_tags
+                        bind:gates
+                        bind:rocks
+                        bind:repeater_dropped
+                        bind:field_of_view
+                        bind:depth_of_view
+                        bind:field_of_view_visible/>
+        </div>
+
+        <div class="radio-signal {{get_radio_strength_class(radio_signal)}}">
+            <label id="radio-signal-value" class="tooltip">
+                Radio Signal Strength: {{radio_signal}}
+                <span class="tooltiptext tooltiptext-below">
+                    Between {{RR_MIN}} and {{RR_MAX}}. The threshold for dropping the radio repeater is {{RR_THRESH}}.
+                </span>
+            </label>
+            <input type="number" bind:value="radio_signal_input"
+                   on:change="valid_signal_strength()"/>
+            <button disabled="{{ !is_valid_signal_strength }}" on:click="update_signal_strength()">
+                Update Signal Strength
+            </button>
+        </div>
+
         <p><label>
             Field Radius (meters):
             <input type="number" bind:value="radius"/>
@@ -72,8 +112,6 @@
             {{#if lcm_connected}}
             <p><b>Navigation State:</b> {{ nav_state_name }}</p>
             <p><b>Completed Waypoints:</b> {{ completed_wps }}/{{ total_wps }}</p>
-            <p><b>Missed Waypoints:</b> {{ missed_wps }}/{{ total_wps }}</p>
-            <p><b>Ar Tags:</b> {{ found_ar_tags }}/{{ total_ar_tags }}</p>
             {{else}}
             <p>LCM not connected.</p>
             {{/if}}
@@ -91,6 +129,7 @@
                     <label for="search_checkbox_{{ i }}">Search?</label>
                     <input type="checkbox" id="gate_checkbox_{{ i }}" bind:checked="waypoint.gate">
                     <label for="gate_checkbox_{{ i }}">Gate?</label>
+                    <label>ID: {{waypoint.id}}</label>
                 </p>
             </SimulatedItemDisplay>
         </div>
@@ -99,7 +138,7 @@
         {{#each ar_tags as ar_tag, i}}
         <div class="display target_display">
             <SimulatedItemDisplay
-                            title="Target {{ i }}"
+                            title="Target {{ ar_tag[0].id }}"
                             item="{{ ar_tag[0] }}"
                             rover="{{ odom }}"
                             on:click='splice("ar_tags", i, 1)'>
@@ -114,9 +153,9 @@
 
         {{#each gates as gate, i}}
         <div class="display gate_display">
-            <div class="gate1_display">
+            <div class="{{get_gate_post_class(gate[0].id)}}">
             <SimulatedItemDisplay
-                            title="Gate Post {{ i }}, 0"
+                            title="Gate Post {{ gate[0].id }}"
                             item="{{ gate[0] }}"
                             rover="{{ odom }}"
                             on:click='splice("gates", i, 1)'>
@@ -133,9 +172,9 @@
             </SimulatedItemDisplay>
             </div>
 
-            <div class="gate2_display">
+            <div class="{{get_gate_post_class(gate[1].id)}}">
             <SimulatedItemDisplay
-                            title="Gate Post {{ i }}, 1"
+                            title="2Gate Post {{ gate[1].id }}"
                             item="{{ gate[1] }}"
                             rover="{{ odom }}"
                             on:click='splice("gates", i, 1)'>
@@ -185,11 +224,18 @@
     import _ from 'lodash';
     import fnv from 'fnv-plus';
     import { splice } from 'svelte-extras';
-    import SimulatorField from './SimulatorField.html';
-    import DrawModeSelector from './DrawModeSelector.html';
-    import SimulatedItemDisplay from './SimulatedItemDisplay.html';
-    import { WAYPOINT_MODE, ROCK_MODE, AR_TAG_MODE, GATE_MODE } from "../constants.js";
+
+    // Import custom logic
+    import { WAYPOINT_MODE,
+             MIN_RADIO_SIGNAL_STRENGTH, MAX_RADIO_SIGNAL_STRENGTH,
+             RADIO_REPEATER_THRESHOLD } from "../constants.js";
     import { to_dms } from '../geography.js';
+
+    // Import custom components
+    import DebugTools from './DebugTools.html'
+    import DrawModeModule from './DrawModeModule.html';
+    import SimulatedItemDisplay from './SimulatedItemDisplay.html';
+    import SimulatorField from './SimulatorField.html';
 
     const NUM_DIGITS = 7;
     let app;
@@ -218,12 +264,23 @@
                 gates: [],
                 rocks: [],
 
+                radio_signal: MAX_RADIO_SIGNAL_STRENGTH,
+                radio_signal_input: RADIO_REPEATER_THRESHOLD - 1,
+                is_valid_signal_strength: true,
+                repeater_dropped: false,
+                repeater_loc: {},
+                RR_MIN: MIN_RADIO_SIGNAL_STRENGTH,
+                RR_MAX: MAX_RADIO_SIGNAL_STRENGTH,
+                RR_THRESH: RADIO_REPEATER_THRESHOLD,
+
                 radius: 25,
+
                 angle: 0,
+                target1_id: -1,
+                target2_id: 5,
+                gate_width: 3, // meters
 
                 test: "<name>",
-
-                current_test: "None",
 
                 ar_tag_state: {
                     detected: false,
@@ -241,13 +298,18 @@
 
                 nav_state_name: "Off",
                 completed_wps: 0,
-                missed_wps: 0,
                 total_wps: 0,
-                found_ar_tags: 0,
-                total_ar_tags: 0,
 
                 enabled: false,
                 cv_enabled: true,
+
+                paused: false,
+                take_step: false,
+                translational_speed: 1,
+                rotational_speed: 2,
+                field_of_view: 110,
+                depth_of_view: 3,
+                field_of_view_visible: false
             }
         },
 
@@ -283,12 +345,46 @@
             },
 
             apply_joystick: function(stick) {
-                this.set({
-                    forward_back: stick.forward_back,
-                    left_right: stick.left_right
-                });
+                if (!this.get('paused') || this.get('take_step')) {
+                    this.set({
+                        take_step: false,
+                        forward_back: stick.forward_back,
+                        left_right: stick.left_right,
+                    });
 
-                this.refs.field.apply_joystick(stick);
+                    this.refs.field.apply_joystick(stick);
+                }
+            },
+
+            update_signal_strength: function() {
+                this.set({
+                    radio_signal: this.get("radio_signal_input")
+                });
+            },
+
+            valid_signal_strength: function() {
+                this.set({
+                    is_valid_signal_strength: this.get("radio_signal_input") >= MIN_RADIO_SIGNAL_STRENGTH &&
+                                              this.get("radio_signal_input") <= MAX_RADIO_SIGNAL_STRENGTH
+                });
+            },
+
+            drop_radio_repeater: function() {
+                if (!this.get('repeater_dropped')) {
+                    // Wait 2 seconds, then 'drop' repeater
+                    setTimeout(function() {
+                        app.set({
+                            radio_signal: MAX_RADIO_SIGNAL_STRENGTH,
+                            repeater_dropped: true,
+                            repeater_loc: app.get('odom')
+                        });
+
+                        // start firing drop complete LCM
+                        setInterval(() => {
+                            app.fire("rr_drop_complete", {});
+                        }, 100);
+                    } , 2000);
+                }
             },
 
             start_odom_events: function() {
@@ -323,12 +419,14 @@
                                 type: "Waypoint",
                                 search: waypoint.search,
                                 gate: waypoint.gate,
+                                id: waypoint.id,
                                 odom: {
                                     latitude_deg: waypoint.latitude_deg|0,
                                     latitude_min: waypoint.latitude_min,
                                     longitude_deg: waypoint.longitude_deg|0,
                                     longitude_min: waypoint.longitude_min,
                                     bearing_deg: 0,
+                                    speed: -1,
                                     type: "Odometry"
                                 }
                             }
@@ -337,6 +435,10 @@
 
                     course.hash = fnv.fast1a52(JSON.stringify(course));
                     this.fire("course", course);
+
+                    this.fire("radio", {
+                        signal_strength: this.get('radio_signal')
+                    });
 
                     if (this.get("cv_enabled")) {
                         const targets = this.get("ar_tag_state");
@@ -347,6 +449,7 @@
                                     type: "Target",
                                     bearing: target.bearing,
                                     distance: target.distance,
+                                    id: target.id,
                                 }
                             })
                         };
@@ -359,9 +462,27 @@
             },
             splice
         },
+
+        helpers: {
+            get_radio_strength_class: function(radio_signal) {
+                if (radio_signal < RADIO_REPEATER_THRESHOLD) {
+                    return 'radio-signal-weak';
+                }
+                return 'radio-signal-strong';
+            },
+
+            get_gate_post_class: function(id) {
+                if (id % 2) {
+                    return 'gate2_display';
+                }
+                return 'gate1_display';
+            }
+        },
+
         components: {
             SimulatorField,
-            DrawModeSelector,
+            DebugTools,
+            DrawModeModule,
             SimulatedItemDisplay
         }
     }
@@ -418,30 +539,77 @@ div + div {
 
 .target_display {
     color: black;
-    background-color: lightgreen;
+    background-color: violet;
 }
 
 .gate_display {
     padding: 0;
+    color: black;
 }
 
 .gate1_display {
-    color: black;
     background: lightblue;
     padding: 5px;
 }
 
 .gate2_display {
-    color: black;
     background: yellow;
     padding: 5px;
 }
 
 .rock_display {
-    background-color: brown;
+    background-color: sienna;
 }
 
 #controls {
     background-color: black;
+}
+
+#sim-field-btns {
+    display: inline-block;
+    width: 100%;
+}
+
+.radio-signal * {
+    display: inline-block;
+}
+
+#radio-signal-value {
+    width: 200px;
+}
+
+.radio-signal-weak {
+    background: salmon;
+}
+
+.radio-signal-strong {
+    background: lightgreen;
+}
+
+.tooltip {
+    position: relative;
+    padding: 10px 0;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 100%;
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 6px;
+    position: absolute;
+    z-index: 1;
+}
+
+.tooltiptext-below {
+    top: 75%;
+    left: 50%;
+    margin-left: -50%; /* Half of the width, to center the tooltip */
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
 }
 </style>
