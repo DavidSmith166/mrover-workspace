@@ -43,7 +43,7 @@ class Simulator:
             for i in range(len(self.truth['gps_north'])):
                 lat_min, lat_deg = math.modf(self.truth['gps_north'][i])
                 lat_min *= 60
-                long_min, long_deg = math.modf(self.truth['gps_west'][i])
+                long_min, long_deg = math.modf(self.truth['gps_east'][i])
                 long_min *= 60
                 bearing = self.truth['bearing'][i]
                 speed = self.truth['vel_total'][i]
@@ -68,7 +68,7 @@ class Simulator:
         gps.latitude_min, gps.latitude_deg = math.modf(self.noisy['gps_north'][self.timesteps])
         gps.latitude_deg = int(gps.latitude_deg)
         gps.latitude_min *= 60
-        gps.longitude_min, gps.longitude_deg = math.modf(self.noisy['gps_west'][self.timesteps])
+        gps.longitude_min, gps.longitude_deg = math.modf(self.noisy['gps_east'][self.timesteps])
         gps.longitude_deg = int(gps.longitude_deg)
         gps.longitude_min *= 60
         gps.bearing_deg = self.noisy['bearing'][self.timesteps]
@@ -91,7 +91,6 @@ class Simulator:
             self.sendTimestep()
 
 
-# for the dumbass linter
 def main():
     sim = Simulator()
     sim.recordTruth()
