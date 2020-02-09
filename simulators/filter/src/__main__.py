@@ -36,6 +36,8 @@ class Simulator:
         self.timesteps = 0
 
     def recordTruth(self):
+        os.makedirs(os.path.join(os.getcwd(), 'onboard', 'filter', 'logs'),
+                    exist_ok=True)
         with open(os.path.join('onboard', 'filter', 'logs', 'truthLog.csv'), mode=self.CSV_MODE)\
                 as log:
             writer = csv.writer(log)
@@ -90,8 +92,6 @@ class Simulator:
         while self.timesteps < len(self.noisy['gps_north']):
             self.sendTimestep()
 
-
-# for the dumbass linter
 def main():
     sim = Simulator()
     sim.recordTruth()
