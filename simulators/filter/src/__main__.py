@@ -93,9 +93,11 @@ class Simulator:
             self.sendTimestep()
 
 def main():
+    print("Starting simulation...")
     sim = Simulator()
     sim.recordTruth()
     sim.run()
+    print("Simulation complete")
 
 
 if __name__ == '__main__':
