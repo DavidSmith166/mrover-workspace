@@ -111,6 +111,7 @@ def main():
             break
         sim.recordTruth()
         sim.run()
+    print("Simulation complete")
 
 
 if __name__ == '__main__':
