@@ -112,7 +112,7 @@ class PathGenerator:
         gps_points_east = scipy.integrate.cumtrapz(vel_points_east, dx=self.DT_S)
         gps_points_east = meters2long(gps_points_east, gps_points_north)
         # gps_points_north = [i + 42.277 for i in gps_points_north]
-        # gps_points_west = [i + 83.7382 for i in gps_points_west]
+        # gps_points_west = [i - 83.7382 for i in gps_points_east]
 
         return {
             "accel_x": accel_points_x,
@@ -167,12 +167,9 @@ class PathGenerator:
 
             yield {"truth": self.truth, "noisy": self.noisy}
 
-    def run(self, new_path):
+    def run(self):
         # returns true and noisy paths. generates new path if new_path
-        if new_path:
-            return next(self.generator())
-        else:
-            return {"truth": self.truth, "noisy": self.noisy}
+        return next(self.generator())
 
 
 def meters2lat(meters):
