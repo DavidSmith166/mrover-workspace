@@ -1,7 +1,5 @@
 import json
-# import math
-# import time
-# import sys
+import sys
 from os import getenv
 
 from rover_common import aiolcm
@@ -22,15 +20,15 @@ class StateEstimate:
     # class for the current state estimates
 
     def __init__(self, lat_deg=None, lat_min=None, vel_north=None,
-                 long_deg=None, long_min=None, vel_west=None, bearing_degs=None):
+                 long_deg=None, long_min=None, vel_east=None, bearing_degs=None):
         self.pos = PositionDegs(lat_deg, long_deg, lat_min, long_min)
-        self.vel = Velocity2D(vel_north, vel_west)
+        self.vel = Velocity2D(vel_north, vel_east)
         self.bearing_degs = bearing_degs
 
     def asLKFInput(self):
         # Returns the state estimate as a list for filter input
         return [self.pos.lat_deg, meters2lat(self.vel.north),
-                self.pos.long_deg, meters2long(self.vel.west,
+                self.pos.long_deg, meters2long(self.vel.east,
                                                self.pos.lat_deg)]
 
     def updateFromLKF(self, numpy_array, bearing_degs):
@@ -38,7 +36,7 @@ class StateEstimate:
         self.pos.lat_deg = numpy_array[0]
         self.pos.long_deg = numpy_array[2]
         self.vel.north = lat2meters(numpy_array[1])
-        self.vel.west = long2meters(numpy_array[3], numpy_array[0])
+        self.vel.east = long2meters(numpy_array[3], numpy_array[0])
         self.bearing_degs = bearing_degs
 
     def asOdom(self):
@@ -128,7 +126,7 @@ class SensorFusion:
             vel = self.gps.absolutifyVel(self.imu.bearing_degs)
 
             self.state_estimate = StateEstimate(pos.lat_deg, None, vel.north,
-                                                pos.long_deg, None, vel.west,
+                                                pos.long_deg, None, vel.east,
                                                 self.imu.bearing_degs)
             self.constructFilter()
 
@@ -149,8 +147,8 @@ class SensorFusion:
             R = self.config['R']
             self.filter = LinearKalman(x_initial, P_initial, Q, R, dt)
         else:
-            # TODO: better error handling
-            pass
+            print("Invalid filter type!")
+            sys.exit(1)
 
     async def run(self):
         # Main loop for running the filter and publishing to odom

@@ -103,7 +103,7 @@ class Plotter:
     def plotPath(self, color, label, subplot_loc):
         # Convert DMS to decimal
         plot.subplot(subplot_loc[0], subplot_loc[1], subplot_loc[2])
-        long = -(self.data['long_deg'] + self.data['long_min']/60)
+        long = self.data['long_deg'] + self.data['long_min']/60
         lat = self.data['lat_deg'] + self.data['lat_min']/60
 
         return plot.scatter(long, lat, color=color, label=label)

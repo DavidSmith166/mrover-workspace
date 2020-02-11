@@ -40,7 +40,7 @@ def pylint(ctx):
     Lints python code with flake8.
     """
     print("Linting...")
-    ctx.run("flake8 --max-line-length=120")
+    ctx.run("flake8 --max-line-length=100")
 
 
 def pyinstall(ctx):

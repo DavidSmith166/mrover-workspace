@@ -105,24 +105,24 @@ class PathGenerator:
         # generate velocities
         vel_points_x = scipy.integrate.cumtrapz(accel_points_x, dx=self.DT_S)
         vel_points_north = np.multiply(vel_points_x, np.multiply(pitch_cos, bearing_cos))
-        vel_points_west = -(np.multiply(vel_points_x, np.multiply(pitch_cos, bearing_sin)))
+        vel_points_east = np.multiply(vel_points_x, np.multiply(pitch_cos, bearing_sin))
 
         gps_points_north = scipy.integrate.cumtrapz(vel_points_north, dx=self.DT_S)
         gps_points_north = meters2lat(gps_points_north)
-        gps_points_west = scipy.integrate.cumtrapz(vel_points_west, dx=self.DT_S)
-        gps_points_west = meters2long(gps_points_west, gps_points_north)
+        gps_points_east = scipy.integrate.cumtrapz(vel_points_east, dx=self.DT_S)
+        gps_points_east = meters2long(gps_points_east, gps_points_north)
         # gps_points_north = [i + 42.277 for i in gps_points_north]
-        # gps_points_west = [i + 83.7382 for i in gps_points_west]
+        # gps_points_west = [i - 83.7382 for i in gps_points_east]
 
         return {
             "accel_x": accel_points_x,
             "accel_y": np.zeros(self.MAX_READINGS),
             "accel_z": np.zeros(self.MAX_READINGS),
             "vel_north": vel_points_north,
-            "vel_west": vel_points_west,
+            "vel_east": vel_points_east,
             "vel_total": vel_points_x,
             "gps_north": gps_points_north,
-            "gps_west": gps_points_west,
+            "gps_east": gps_points_east,
             "bearing": bearing_angles_degs,
             "pitch": pitch_angles_degs
         }
@@ -140,7 +140,7 @@ class PathGenerator:
 
         noisy_gps_points_north = np.random.normal(truth['gps_north'],
                                                   meters2lat(self.GPS_LAT_STDEV_METERS))
-        noisy_gps_points_west = np.random.normal(truth['gps_west'],
+        noisy_gps_points_east = np.random.normal(truth['gps_east'],
                                                  [abs(i) for i in
                                                   meters2long(self.GPS_LONG_STDEV_METERS,
                                                               truth['gps_north'])])
@@ -154,7 +154,7 @@ class PathGenerator:
             "accel_z": noisy_accel_points_z,
             "vel_total": noisy_vel_points_total,
             "gps_north": noisy_gps_points_north,
-            "gps_west": noisy_gps_points_west,
+            "gps_east": noisy_gps_points_east,
             "bearing": noisy_bearing_angles_degs,
             "pitch": noisy_pitch_angles_degs
         }
@@ -167,12 +167,9 @@ class PathGenerator:
 
             yield {"truth": self.truth, "noisy": self.noisy}
 
-    def run(self, new_path):
+    def run(self):
         # returns true and noisy paths. generates new path if new_path
-        if new_path:
-            return next(self.generator())
-        else:
-            return {"truth": self.truth, "noisy": self.noisy}
+        return next(self.generator())
 
 
 def meters2lat(meters):
