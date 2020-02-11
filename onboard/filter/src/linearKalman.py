@@ -65,8 +65,8 @@ class LinearKalman:
                              [0., 0.5*dt**2.],
                              [0., dt]])
 
-        self.kf.H = np.eye(4)
-        # self.kf.H = np.diag([1, 0, 1, 0])
+        # self.kf.H = np.eye(4)
+        self.kf.H = np.diag([1, 0, 1, 0])
 
         # calculate process noise
         Q_lat = Q_discrete_white_noise(dim=2, dt=dt,

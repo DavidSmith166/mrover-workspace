@@ -1,7 +1,7 @@
 {
     "gps_lat_stdev_meters" : 1,
     "gps_long_stdev_meters" : 1.8,
-    "gps_vel_stdev_meters" : 0.04,
+    "gps_vel_stdev_meters" : 0.2,
     "gps_bearing_stdev_degs" : 10,
     "gps_update_rate_millis" : 50,
 
@@ -16,11 +16,9 @@
     "max_rot_vel_rads" : 2.5,
     "max_pitch_vel_rads" : 0.5,
     "dt_s" : 0.01,
-    "end_time" : 250,
+    "end_time" : 100,
 
     "send_rate_millis" : 5,
 
-    "csv_mode" : "a",
-
-    "new_path" : true
+    "csv_mode" : "a"
 }
