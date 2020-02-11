@@ -22,10 +22,6 @@ class Logger:
         with open(config_path, "r") as config:
             self.filterConfig = json.load(config)
 
-        # Create logs directory if it does not exist
-        os.makedirs(os.path.join(os.getcwd(), 'onboard', 'filter', 'logs'),
-                    exist_ok=True)
-
         # Create files and write headers
         self.write(['lat_deg', 'lat_min', 'long_deg', 'long_min', 'bearing',
                     'speed'], 'gps')
