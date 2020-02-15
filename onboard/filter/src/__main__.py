@@ -6,10 +6,9 @@ from rover_common import aiolcm
 import asyncio
 from rover_common.aiohelper import run_coroutines
 from rover_msgs import IMU, GPS, SensorPackage, Odometry
-from .inputs import RawGPS, RawPhone, RawIMU, Velocity2D, \
-                    PositionDegs
+from .inputs import Gps, Phone, Imu, Velocity2D, PositionDegs
 from .logger import Logger
-from .linearKalman import LinearKalman
+from .linearKalman import LinearKalmanFilter
 from .conversions import meters2lat, meters2long, lat2meters, long2meters, \
                         decimal2min
 # don't have nav status in here yet
@@ -60,9 +59,9 @@ class SensorFusion:
             self.config = json.load(config)
 
         # Inputs
-        self.gps = RawGPS()
-        self.imu = RawIMU()
-        self.phone = RawPhone()
+        self.gps = Gps()
+        self.imu = Imu()
+        self.phone = Phone()
         # self.nav_status = RawNavStatus()
 
         self.filter = None
@@ -101,7 +100,7 @@ class SensorFusion:
 
             self.gps_readings.pop(0)
 
-        self.gps_readings.append(self.gps.asDecimal())
+        self.gps_readings.append(self.gps.pos.asDecimal())
 
     def gpsCallback(self, channel, msg):
         new_gps = GPS.decode(msg)
@@ -122,12 +121,12 @@ class SensorFusion:
             self.filter.run(self.gps, self.imu, self.state_estimate)
         # Construct state estimate and filter if sensors are ready
         elif self.sensorsReady():
-            pos = self.gps.asDecimal()
-            vel = self.gps.absolutifyVel(self.imu.bearing_degs)
+            pos = self.gps.pos.asDecimal()
+            vel = self.gps.vel.absolutify(self.imu.bearing.bearing_degs)
 
             self.state_estimate = StateEstimate(pos.lat_deg, None, vel.north,
                                                 pos.long_deg, None, vel.east,
-                                                self.imu.bearing_degs)
+                                                self.imu.bearing.bearing_degs)
             self.constructFilter()
 
     # def navStatusCallback(self, channel, msg):
@@ -145,7 +144,8 @@ class SensorFusion:
             P_initial = self.config['P_initial']
             Q = self.config['Q']
             R = self.config['R']
-            self.filter = LinearKalman(x_initial, P_initial, Q, R, dt)
+            self.filter = LinearKalmanFilter(dim_x=4, dim_z=4, dim_u=2)
+            self.filter.construct(x_initial, P_initial, Q, R, dt)
         else:
             print("Invalid filter type!")
             sys.exit(1)
