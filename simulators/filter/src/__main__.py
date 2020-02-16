@@ -75,6 +75,8 @@ class Simulator:
         gps.longitude_min *= 60
         gps.bearing_deg = self.noisy['bearing'][self.timesteps]
         gps.speed = self.noisy['vel_total'][self.timesteps]
+        if gps.speed < 0:
+            gps.speed = 0
 
         if self.timesteps % self.GPS_DTS == 0:
             self.lcm.publish('/gps', gps.encode())
