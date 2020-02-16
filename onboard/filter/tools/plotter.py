@@ -106,6 +106,10 @@ class Plotter:
         long = self.data['long_deg'] + self.data['long_min']/60
         lat = self.data['lat_deg'] + self.data['lat_min']/60
 
+        # Convert to meters
+        long = long2meters(long, lat)
+        lat = lat2meters(lat)
+
         return plot.scatter(long, lat, color=color, label=label)
 
     def plot(self, data_type):

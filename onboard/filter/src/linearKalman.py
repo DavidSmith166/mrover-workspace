@@ -117,6 +117,7 @@ class LinearKalmanFilter:
                            [0., dt]])
 
         self.H = np.eye(4)
+        # self.H = np.diag([1, 0, 1, 0])
 
         # calculate process noise
         Q_lat = Q_discrete_white_noise(dim=2, dt=dt,
@@ -127,7 +128,7 @@ class LinearKalmanFilter:
                                         block_size=1)
         self.Q = block_diag(Q_lat, Q_long)
 
-    def predict(self, u=None, B=None, F=None, Q=None):
+    def _predict(self, u=None, B=None, F=None, Q=None):
         """
         Predict next state (prior) using the Kalman filter state propagation
         equations.
@@ -165,7 +166,7 @@ class LinearKalmanFilter:
         # P = FPF' + Q
         self.P = dot(dot(F, self.P), F.T) + Q
 
-    def update(self, z, R=None, H=None):
+    def _update(self, z, R=None, H=None):
         """
         Add a new measurement (z) to the Kalman filter.
         If z is None, nothing is computed. However, x_post and P_post are
@@ -229,33 +230,94 @@ class LinearKalmanFilter:
 
     def run(self, gps, imu, state_estimate):
         # predicts forward given sensors
-        # returns new state
 
-        measured_pos = gps.pos.asDecimal()
+        ref_bearing = self._getRefBearing(gps, imu)
+        measured_pos = self._genPos(gps)
+        ref_lat = measured_pos.lat_deg if measured_pos is not None else state_estimate.pos.lat_deg
+        measured_vel = self._genVel(gps, ref_bearing, ref_lat)
+        measured_accel = self._genAccel(imu, ref_bearing, ref_lat)
 
-        measured_vel = gps.vel.absolutify(imu.bearing.bearing_degs)
-        measured_vel.north = meters2lat(measured_vel.north)
-        measured_vel.east = meters2long(measured_vel.east, measured_pos.lat_deg)
+        # measured_vel = gps.vel.absolutify(imu.bearing.bearing_degs)
+        # measured_vel.north = meters2lat(measured_vel.north)
+        # measured_vel.east = meters2long(measured_vel.east, measured_pos.lat_deg)
 
-        measured_accel = imu.accel.absolutify(imu.bearing.bearing_degs, imu.pitch_degs)
-        measured_accel.north = meters2lat(measured_accel.north)
-        measured_accel.east = meters2long(measured_accel.east, measured_pos.lat_deg)
+        # measured_accel = imu.accel.absolutify(imu.bearing.bearing_degs, imu.pitch_degs)
+        # measured_accel.north = meters2lat(measured_accel.north)
+        # measured_accel.east = meters2long(measured_accel.east, measured_pos.lat_deg)
 
-        u = [measured_accel.north, measured_accel.east]
+        if measured_accel is not None:
+            u = [measured_accel.north, measured_accel.east]
+            self._predict(np.array(u))
 
-        z = [measured_pos.lat_deg, measured_vel.north,
-             measured_pos.long_deg, measured_vel.east]
-
-        self.predict(np.array(u))
-        self.update(np.array(z))
+        if measured_pos is not None:
+            if measured_vel is not None:
+                z = [measured_pos.lat_deg, measured_vel.north,
+                     measured_pos.long_deg, measured_vel.east]
+                self._update(np.array(z))
+            else:
+                z = [measured_pos.lat_deg, 3538.,
+                     3538., measured_vel.east]
+                self._update(np.array(z), H=np.diag([1, 0, 1, 0]))
+        else:
+            if measured_vel is not None:
+                z = [3538., measured_vel.north,
+                     measured_pos.long_deg, 3538.]
+                self._update(np.array(z), H=np.diag([0, 1, 0, 1]))
+            else:
+                pass
 
         state_estimate.updateFromLKF(self.x, imu.bearing.bearing_degs)
-    
-    def runFromGps(self, gps, state_estimate):
-        pass
-    
-    def runFromImu(self, imu, state_estimate):
-        pass
 
-    def runFromGpsImu(self, gps, imu, state_estimate):
-        pass
+    def _getRefBearing(self, gps, imu):
+        # returns reference bearing given bearing sensors
+        ref_bearing = None
+
+        if imu.fresh:
+            ref_bearing = imu.bearing.bearing_degs
+        elif gps.fresh:
+            ref_bearing = gps.bearing.bearing_degs
+
+        return ref_bearing
+
+    def _genPos(self, gps):
+        # generates position measurement given position sensors
+        measurement = None
+
+        if gps.fresh:
+            measurement = gps.pos.asDecimal()
+
+        return measurement
+
+    def _genVel(self, gps, ref_bearing, ref_lat):
+        # generates velocity measurement given velocity sensors, reference bearing,
+        # and reference latitude
+        if ref_bearing is None or ref_lat is None:
+            return None
+
+        measurement = None
+
+        if gps.fresh:
+            measurement = gps.vel.absolutify(ref_bearing)
+
+        if measurement is not None:
+            measurement.north = meters2lat(measurement.north)
+            measurement.east = meters2long(measurement.east, ref_lat)
+
+        return measurement
+
+    def _genAccel(self, imu, ref_bearing, ref_lat):
+        # generates acceleration measurement given acceleration sensors, reference bearing,
+        # and reference latitude
+        if ref_bearing is None or ref_lat is None:
+            return None
+
+        measurement = None
+
+        if imu.fresh:
+            measurement = imu.accel.absolutify(ref_bearing, imu.pitch_degs)
+
+        if measurement is not None:
+            measurement.north = meters2lat(measurement.north)
+            measurement.east = meters2long(measurement.east, ref_lat)
+
+        return measurement

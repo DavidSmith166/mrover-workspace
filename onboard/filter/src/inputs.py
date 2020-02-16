@@ -2,6 +2,7 @@ import math
 from abc import ABC, abstractmethod
 from .conversions import min2decimal, deg2rad
 
+
 class Sensor(ABC):
     # Abstract class for sensors
     def __init__(self):
@@ -25,6 +26,7 @@ class SensorComponent(ABC):
     @abstractmethod
     def ready(self):
         pass
+
 
 class AccelComponent(SensorComponent):
     # Class for acceleration sensor component
