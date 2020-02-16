@@ -1,17 +1,41 @@
 import math
-from abc import ABC
+from abc import ABC, abstractmethod
 from .conversions import min2decimal, deg2rad
 
 
-class RawAccelSensor(ABC):
-    # Abstract class for acceleration sensors
+class Sensor(ABC):
+    # Abstract class for sensors
+    def __init__(self):
+        self.fresh = True
+
+    @abstractmethod
+    def update(self, new_sensor):
+        self.fresh = True
+
+    @abstractmethod
+    def ready(self):
+        pass
+
+
+class SensorComponent(ABC):
+    # Abstract class for sensor components
+    @abstractmethod
+    def update(self, new_sensor_component):
+        pass
+
+    @abstractmethod
+    def ready(self):
+        pass
+
+
+class AccelComponent(SensorComponent):
+    # Class for acceleration sensor component
 
     def __init__(self):
         self.accel_x = None
         self.accel_y = None
         self.accel_z = None
 
-    # Are acceleration sensors generic/standardized enough to allow this?
     def update(self, new_accel_sensor):
         self.accel_x = new_accel_sensor.accel_x
         self.accel_y = new_accel_sensor.accel_y
@@ -22,7 +46,7 @@ class RawAccelSensor(ABC):
             self.accel_z is not None
 
     # Converts acceleration to absolute components
-    def absolutifyAccel(self, bearing_degs, pitch_degs):
+    def absolutify(self, bearing_degs, pitch_degs):
         if self.accel_x is None or bearing_degs is None or pitch_degs is None:
             return None
 
@@ -34,8 +58,8 @@ class RawAccelSensor(ABC):
         return Acceleration(accel_north, accel_east, accel_z)
 
 
-class RawVelSensor(ABC):
-    # Abstract class for velocity sensors
+class VelComponent(SensorComponent):
+    # Class for velocity sensor component
 
     def __init__(self):
         self.vel_raw = None
@@ -48,7 +72,7 @@ class RawVelSensor(ABC):
         return self.vel_raw is not None
 
     # Separates vel_raw into absolute components
-    def absolutifyVel(self, bearing_degs):
+    def absolutify(self, bearing_degs):
         if self.vel_raw is None or bearing_degs is None:
             return None
 
@@ -61,8 +85,8 @@ class RawVelSensor(ABC):
         return Velocity2D(vel_north, vel_east)
 
 
-class RawPosSensor(ABC):
-    # Abstract class for position sensors
+class PosComponent(SensorComponent):
+    # Class for position sensor component
 
     def __init__(self):
         self.lat_deg = None
@@ -84,8 +108,8 @@ class RawPosSensor(ABC):
         return PositionDegs(self.lat_deg, self.long_deg, self.lat_min, self.long_min)
 
 
-class RawBearingSensor(ABC):
-    # Abstract class for bearing sensors
+class BearingComponent(SensorComponent):
+    # Class for acceleration bearing component
 
     def __init__(self):
         self.bearing_degs = None
@@ -96,18 +120,17 @@ class RawBearingSensor(ABC):
     def update(self, new_bearing_sensor):
         # Account for non-standardized LCM structs >:(
         if hasattr(new_bearing_sensor, 'bearing'):
-            # TODO check for degrees vs radians
             self.bearing_degs = new_bearing_sensor.bearing
         else:
             self.bearing_degs = new_bearing_sensor.bearing_deg
 
 
-class RawIMU(RawAccelSensor, RawBearingSensor):
+class Imu(Sensor):
     # Class for IMU data
 
     def __init__(self):
-        RawAccelSensor.__init__(self)
-        RawBearingSensor.__init__(self)
+        self.accel = AccelComponent()
+        self.bearing = BearingComponent()
         self.gyro_x = None
         self.gyro_y = None
         self.gyro_z = None
@@ -120,71 +143,70 @@ class RawIMU(RawAccelSensor, RawBearingSensor):
 
     def update(self, new_imu):
         # Updates the IMU with new LCM data
-        RawAccelSensor.update(self, new_imu)
-        RawBearingSensor.update(self, new_imu)
+        self.accel.update(new_imu)
+        self.bearing.update(new_imu)
         self.gyro_x = new_imu.gyro_x
         self.gyro_y = new_imu.gyro_y
         self.gyro_z = new_imu.gyro_z
         self.mag_x = new_imu.mag_x
         self.mag_y = new_imu.mag_y
         self.mag_z = new_imu.mag_z
-        # TODO check for degrees or radians
-        # TODO add roll and yaw
+        # TODO add roll and yaw, PAY ATTENTION TO UNITS
         self.pitch_degs = new_imu.pitch
+        super().update(new_imu)
 
     def ready(self):
         # TODO add roll and yaw
-        return RawAccelSensor.ready(self) and \
-            RawBearingSensor.ready(self) and self.gyro_x is not None and \
+        return self.accel.ready() and \
+            self.bearing.ready() and self.gyro_x is not None and \
             self.gyro_y is not None and self.gyro_z is not None and \
             self.mag_x is not None and self.mag_y is not None and \
             self.mag_z is not None and self.pitch_degs is not None
 
 
-class RawEncoder(RawVelSensor):
-    # Class for wheel encoder data
-
-    def __init__(self):
-        RawVelSensor.__init__(self)
-
-    def update(self, new_encoder):
-        # Updates the encoder with new LCM data
-        pass
-
-
-class RawGPS(RawVelSensor, RawPosSensor, RawBearingSensor):
+class Gps(Sensor):
     # Class for GPS data
 
     def __init__(self):
-        RawVelSensor.__init__(self)
-        RawPosSensor.__init__(self)
-        RawBearingSensor.__init__(self)
+        self.vel = VelComponent()
+        self.pos = PosComponent()
+        self.bearing = BearingComponent()
 
     def update(self, new_gps):
         # Updates the GPS with new LCM data
-        RawVelSensor.update(self, new_gps)
-        RawPosSensor.update(self, new_gps)
-        RawBearingSensor.update(self, new_gps)
+        self.vel.update(new_gps)
+        self.pos.update(new_gps)
+        self.bearing.update(new_gps)
+        super().update(new_gps)
 
     def ready(self):
-        return RawVelSensor.ready(self) and RawPosSensor.ready(self) \
-            and RawBearingSensor.ready(self)
+        return self.vel.ready() and self.pos.ready() and self.bearing.ready()
 
 
-class RawPhone(RawPosSensor, RawBearingSensor):
+class Phone(Sensor):
     # Class for burner phone data
 
     def __init__(self):
-        RawPosSensor.__init__(self)
-        RawBearingSensor.__init__(self)
+        self.pos = PosComponent()
+        self.bearing = BearingComponent()
 
     def update(self, new_phone):
         # Updates the phone with new LCM data
-        RawPosSensor.update(self, new_phone)
-        RawBearingSensor.update(self, new_phone)
+        self.pos.update(new_phone)
+        self.bearing.update(new_phone)
 
     def ready(self):
-        return RawPosSensor.ready(self) and RawAccelSensor.ready(self)
+        return self.pos.ready() and self.bearing.ready()
+
+
+class NavStatus:
+    # Class for nav status
+
+    def __init__(self):
+        self.nav_status = None
+
+    def update(self, new_nav_status):
+        self.nav_status = new_nav_status.nav_state_name
 
 
 class Acceleration:
@@ -215,13 +237,3 @@ class PositionDegs:
         else:
             self.lat_deg = min2decimal(lat_deg, lat_min)
             self.long_deg = min2decimal(long_deg, long_min)
-
-
-class RawNavStatus:
-    # Class for nav status
-
-    def __init__(self):
-        self.nav_status = None
-
-    def update(self, new_nav_status):
-        self.nav_status = new_nav_status.nav_state_name

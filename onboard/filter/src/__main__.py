@@ -6,14 +6,12 @@ from rover_common import aiolcm
 import asyncio
 from rover_common.aiohelper import run_coroutines
 from rover_msgs import IMU, GPS, SensorPackage, Odometry
-from .inputs import RawGPS, RawPhone, RawIMU, Velocity2D, \
-                    PositionDegs
+from .inputs import Gps, Phone, Imu, Velocity2D, PositionDegs
 from .logger import Logger
-from .linearKalman import LinearKalman
+from .linearKalman import LinearKalmanFilter
 from .conversions import meters2lat, meters2long, lat2meters, long2meters, \
                         decimal2min
 # don't have nav status in here yet
-# TODO handle losing sensors
 
 
 class StateEstimate:
@@ -24,6 +22,7 @@ class StateEstimate:
         self.pos = PositionDegs(lat_deg, long_deg, lat_min, long_min)
         self.vel = Velocity2D(vel_north, vel_east)
         self.bearing_degs = bearing_degs
+        self.fresh = True
 
     def asLKFInput(self):
         # Returns the state estimate as a list for filter input
@@ -38,6 +37,7 @@ class StateEstimate:
         self.vel.north = lat2meters(numpy_array[1])
         self.vel.east = long2meters(numpy_array[3], numpy_array[0])
         self.bearing_degs = bearing_degs
+        self.fresh = True
 
     def asOdom(self):
         # Returns the current state estimate as an Odometry LCM object
@@ -60,9 +60,9 @@ class SensorFusion:
             self.config = json.load(config)
 
         # Inputs
-        self.gps = RawGPS()
-        self.imu = RawIMU()
-        self.phone = RawPhone()
+        self.gps = Gps()
+        self.imu = Imu()
+        self.phone = Phone()
         # self.nav_status = RawNavStatus()
 
         self.filter = None
@@ -101,13 +101,26 @@ class SensorFusion:
 
             self.gps_readings.pop(0)
 
-        self.gps_readings.append(self.gps.asDecimal())
+        self.gps_readings.append(self.gps.pos.asDecimal())
 
     def gpsCallback(self, channel, msg):
         new_gps = GPS.decode(msg)
         self.gps.update(new_gps)
         # temp mov_avg filter
         self.movAvg()
+
+        # Construct filter if first
+        if self.filter is None and self.gps.ready():
+            ref_bearing = self.imu.bearing.bearing_degs if self.imu.ready() \
+                else self.gps.bearing.bearing_degs
+            pos = self.gps.pos.asDecimal()
+            vel = self.gps.vel.absolutify(ref_bearing)
+
+            self.state_estimate = StateEstimate(pos.lat_deg, None, vel.north,
+                                                pos.long_deg, None, vel.east,
+                                                ref_bearing)
+            self.constructFilter()
+            self.gps.fresh = False
 
     def phoneCallback(self, channel, msg):
         new_phone = SensorPackage.decode(msg)
@@ -118,24 +131,14 @@ class SensorFusion:
         self.imu.update(new_imu)
 
         # Run filter if constructed and sensors are ready
-        if self.sensorsReady() and self.filter is not None:
+        if self.filter is not None:
             self.filter.run(self.gps, self.imu, self.state_estimate)
-        # Construct state estimate and filter if sensors are ready
-        elif self.sensorsReady():
-            pos = self.gps.asDecimal()
-            vel = self.gps.absolutifyVel(self.imu.bearing_degs)
-
-            self.state_estimate = StateEstimate(pos.lat_deg, None, vel.north,
-                                                pos.long_deg, None, vel.east,
-                                                self.imu.bearing_degs)
-            self.constructFilter()
+            self.gps.fresh = False
+            self.imu.fresh = False
 
     # def navStatusCallback(self, channel, msg):
     #     new_nav_status = NavStatus.decode(msg)
     #     self.nav_status.update(new_nav_status)
-
-    def sensorsReady(self):
-        return self.gps.ready() and self.imu.ready()
 
     def constructFilter(self):
         dt = self.config['dt']
@@ -145,7 +148,8 @@ class SensorFusion:
             P_initial = self.config['P_initial']
             Q = self.config['Q']
             R = self.config['R']
-            self.filter = LinearKalman(x_initial, P_initial, Q, R, dt)
+            self.filter = LinearKalmanFilter(dim_x=4, dim_z=4, dim_u=2)
+            self.filter.construct(x_initial, P_initial, Q, R, dt)
         else:
             print("Invalid filter type!")
             sys.exit(1)
@@ -153,9 +157,10 @@ class SensorFusion:
     async def run(self):
         # Main loop for running the filter and publishing to odom
         while True:
-            if self.sensorsReady() and self.filter is not None:
+            if self.filter is not None and self.state_estimate.fresh:
                 odom = self.state_estimate.asOdom()
                 self.lcm.publish('/odometry', odom.encode())
+                self.state_estimate.fresh = False
             await asyncio.sleep(self.config["UpdateRate"])
 
 
