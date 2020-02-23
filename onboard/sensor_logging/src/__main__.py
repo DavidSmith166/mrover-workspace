@@ -23,7 +23,7 @@ class Logger:
         with open(config_path, "r") as config:
             self.filterConfig = json.load(config)
 
-        # Make logs if they don't already exist
+        # Create logs directory if it does not exist
         os.makedirs(os.path.join(os.getcwd(), 'onboard', 'filter', 'logs'),
                     exist_ok=True)
 
