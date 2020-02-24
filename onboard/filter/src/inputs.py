@@ -6,7 +6,7 @@ from .conversions import min2decimal, deg2rad
 class Sensor(ABC):
     # Abstract class for sensors
     def __init__(self):
-        self.fresh = True
+        self.fresh = False
 
     @abstractmethod
     def update(self, new_sensor):
@@ -129,6 +129,7 @@ class Imu(Sensor):
     # Class for IMU data
 
     def __init__(self):
+        super().__init__()
         self.accel = AccelComponent()
         self.bearing = BearingComponent()
         self.gyro_x = None
@@ -168,6 +169,7 @@ class Gps(Sensor):
     # Class for GPS data
 
     def __init__(self):
+        super().__init__()
         self.vel = VelComponent()
         self.pos = PosComponent()
         self.bearing = BearingComponent()
@@ -187,6 +189,7 @@ class Phone(Sensor):
     # Class for burner phone data
 
     def __init__(self):
+        super().__init__()
         self.pos = PosComponent()
         self.bearing = BearingComponent()
 
