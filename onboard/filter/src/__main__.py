@@ -58,7 +58,6 @@ class SensorFusion:
         config_path += "/config_filter/config.json"
         with open(config_path, "r") as config:
             self.config = json.load(config)
-            self.fresh_override = self.config['FreshOverride'] == 1
 
         # Inputs
         self.gps = Gps()
@@ -154,7 +153,7 @@ class SensorFusion:
         while True:
             if self.filter is not None:
                 # Run filter if constructed and sensors are ready
-                self.filter.run(self.gps, self.imu, self.state_estimate, self.fresh_override)
+                self.filter.run(self.gps, self.imu, self.state_estimate)
                 self.gps.fresh = False
                 self.imu.fresh = False
                 if self.state_estimate.fresh:

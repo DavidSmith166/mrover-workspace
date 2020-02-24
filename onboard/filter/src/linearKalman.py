@@ -251,14 +251,14 @@ class LinearKalmanFilter:
         I_KH = self._I - dot(self.K, H)
         self.P = dot(dot(I_KH, self.P), I_KH.T) + dot(dot(self.K, R), self.K.T)
 
-    def run(self, gps, imu, state_estimate, fresh_override):
+    def run(self, gps, imu, state_estimate):
         # predicts forward given sensors
 
-        ref_bearing = self._getRefBearing(gps, imu, fresh_override)
-        measured_pos = self._genPos(gps, fresh_override)
+        ref_bearing = self._getRefBearing(gps, imu)
+        measured_pos = self._genPos(gps)
         ref_lat = measured_pos.lat_deg if measured_pos is not None else state_estimate.pos.lat_deg
-        measured_vel = self._genVel(gps, ref_bearing, ref_lat, fresh_override)
-        measured_accel = self._genAccel(imu, ref_bearing, ref_lat, fresh_override)
+        measured_vel = self._genVel(gps, ref_bearing, ref_lat)
+        measured_accel = self._genAccel(imu, ref_bearing, ref_lat)
 
         if measured_accel is not None:
             u = [measured_accel.north, measured_accel.east]
@@ -288,27 +288,27 @@ class LinearKalmanFilter:
         else:
             state_estimate.updateFromLKF(self.x, ref_bearing, True)
 
-    def _getRefBearing(self, gps, imu, fresh_override):
+    def _getRefBearing(self, gps, imu):
         # returns reference bearing given bearing sensors
         ref_bearing = None
 
-        if imu.fresh or fresh_override:
+        if imu.fresh:
             ref_bearing = imu.bearing.bearing_degs
-        elif gps.fresh or fresh_override:
+        elif gps.fresh:
             ref_bearing = gps.bearing.bearing_degs
 
         return ref_bearing
 
-    def _genPos(self, gps, fresh_override):
+    def _genPos(self, gps):
         # generates position measurement given position sensors
         measurement = None
 
-        if gps.fresh or fresh_override:
+        if gps.fresh:
             measurement = gps.pos.asDecimal()
 
         return measurement
 
-    def _genVel(self, gps, ref_bearing, ref_lat, fresh_override):
+    def _genVel(self, gps, ref_bearing, ref_lat):
         # generates velocity measurement given velocity sensors, reference bearing,
         # and reference latitude
         if ref_bearing is None or ref_lat is None:
@@ -316,7 +316,7 @@ class LinearKalmanFilter:
 
         measurement = None
 
-        if gps.fresh or fresh_override:
+        if gps.fresh:
             measurement = gps.vel.absolutify(ref_bearing)
 
         if measurement is not None:
@@ -325,7 +325,7 @@ class LinearKalmanFilter:
 
         return measurement
 
-    def _genAccel(self, imu, ref_bearing, ref_lat, fresh_override):
+    def _genAccel(self, imu, ref_bearing, ref_lat):
         # generates acceleration measurement given acceleration sensors, reference bearing,
         # and reference latitude
         if ref_bearing is None or ref_lat is None:
@@ -333,7 +333,7 @@ class LinearKalmanFilter:
 
         measurement = None
 
-        if imu.fresh or fresh_override:
+        if imu.fresh:
             measurement = imu.accel.absolutify(ref_bearing, imu.pitch_degs)
 
         if measurement is not None:
