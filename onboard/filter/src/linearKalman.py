@@ -228,6 +228,29 @@ class LinearKalmanFilter:
         I_KH = self._I - dot(self.K, H)
         self.P = dot(dot(I_KH, self.P), I_KH.T) + dot(dot(self.K, R), self.K.T)
 
+        # common subexpression for speed
+        PHT = dot(self.P, H.T)
+
+        # S = HPH' + R
+        # project system uncertainty into measurement space
+        self.S = dot(H, PHT) + R
+        self.SI = self.inv(self.S)
+        # K = PH'inv(S)
+        # map system uncertainty into kalman gain
+        self.K = dot(PHT, self.SI)
+
+        # x = x + Ky
+        # predict new x with residual scaled by the kalman gain
+        self.x = self.x + dot(self.K, self.y)
+
+        # P = (I-KH)P(I-KH)' + KRK'
+        # This is more numerically stable
+        # and works for non-optimal K vs the equation
+        # P = (I-KH)P usually seen in the literature.
+
+        I_KH = self._I - dot(self.K, H)
+        self.P = dot(dot(I_KH, self.P), I_KH.T) + dot(dot(self.K, R), self.K.T)
+
     def run(self, gps, imu, state_estimate, fresh_override):
         # predicts forward given sensors
 
