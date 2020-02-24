@@ -228,6 +228,29 @@ class LinearKalmanFilter:
         I_KH = self._I - dot(self.K, H)
         self.P = dot(dot(I_KH, self.P), I_KH.T) + dot(dot(self.K, R), self.K.T)
 
+        # common subexpression for speed
+        PHT = dot(self.P, H.T)
+
+        # S = HPH' + R
+        # project system uncertainty into measurement space
+        self.S = dot(H, PHT) + R
+        self.SI = self.inv(self.S)
+        # K = PH'inv(S)
+        # map system uncertainty into kalman gain
+        self.K = dot(PHT, self.SI)
+
+        # x = x + Ky
+        # predict new x with residual scaled by the kalman gain
+        self.x = self.x + dot(self.K, self.y)
+
+        # P = (I-KH)P(I-KH)' + KRK'
+        # This is more numerically stable
+        # and works for non-optimal K vs the equation
+        # P = (I-KH)P usually seen in the literature.
+
+        I_KH = self._I - dot(self.K, H)
+        self.P = dot(dot(I_KH, self.P), I_KH.T) + dot(dot(self.K, R), self.K.T)
+
     def run(self, gps, imu, state_estimate):
         # predicts forward given sensors
 
@@ -237,17 +260,11 @@ class LinearKalmanFilter:
         measured_vel = self._genVel(gps, ref_bearing, ref_lat)
         measured_accel = self._genAccel(imu, ref_bearing, ref_lat)
 
-        # measured_vel = gps.vel.absolutify(imu.bearing.bearing_degs)
-        # measured_vel.north = meters2lat(measured_vel.north)
-        # measured_vel.east = meters2long(measured_vel.east, measured_pos.lat_deg)
-
-        # measured_accel = imu.accel.absolutify(imu.bearing.bearing_degs, imu.pitch_degs)
-        # measured_accel.north = meters2lat(measured_accel.north)
-        # measured_accel.east = meters2long(measured_accel.east, measured_pos.lat_deg)
-
         if measured_accel is not None:
             u = [measured_accel.north, measured_accel.east]
             self._predict(np.array(u))
+        else:
+            self._predict(Q=self.Q*6)
 
         if measured_pos is not None:
             if measured_vel is not None:
@@ -256,17 +273,20 @@ class LinearKalmanFilter:
                 self._update(np.array(z))
             else:
                 z = [measured_pos.lat_deg, 3538.,
-                     3538., measured_vel.east]
+                     measured_pos.long_deg, 3538.]
                 self._update(np.array(z), H=np.diag([1, 0, 1, 0]))
         else:
             if measured_vel is not None:
                 z = [3538., measured_vel.north,
-                     measured_pos.long_deg, 3538.]
+                     3538., measured_vel.east]
                 self._update(np.array(z), H=np.diag([0, 1, 0, 1]))
             else:
                 pass
 
-        state_estimate.updateFromLKF(self.x, imu.bearing.bearing_degs)
+        if measured_accel is None and measured_vel is None and measured_pos is None:
+            state_estimate.updateFromLKF(self.x, ref_bearing, False)
+        else:
+            state_estimate.updateFromLKF(self.x, ref_bearing, True)
 
     def _getRefBearing(self, gps, imu):
         # returns reference bearing given bearing sensors
