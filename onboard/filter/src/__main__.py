@@ -30,14 +30,14 @@ class StateEstimate:
                 self.pos.long_deg, meters2long(self.vel.east,
                                                self.pos.lat_deg)]
 
-    def updateFromLKF(self, numpy_array, bearing_degs):
+    def updateFromLKF(self, numpy_array, bearing_degs, fresh):
         # Updates the list from the numpy array output of the filter
         self.pos.lat_deg = numpy_array[0]
         self.pos.long_deg = numpy_array[2]
         self.vel.north = lat2meters(numpy_array[1])
         self.vel.east = long2meters(numpy_array[3], numpy_array[0])
         self.bearing_degs = bearing_degs
-        self.fresh = True
+        self.fresh = fresh
 
     def asOdom(self):
         # Returns the current state estimate as an Odometry LCM object
@@ -58,6 +58,7 @@ class SensorFusion:
         config_path += "/config_filter/config.json"
         with open(config_path, "r") as config:
             self.config = json.load(config)
+            self.fresh_override = self.config['FreshOverride'] == 1
 
         # Inputs
         self.gps = Gps()
@@ -130,12 +131,6 @@ class SensorFusion:
         new_imu = IMU.decode(msg)
         self.imu.update(new_imu)
 
-        # Run filter if constructed and sensors are ready
-        if self.filter is not None:
-            self.filter.run(self.gps, self.imu, self.state_estimate)
-            self.gps.fresh = False
-            self.imu.fresh = False
-
     # def navStatusCallback(self, channel, msg):
     #     new_nav_status = NavStatus.decode(msg)
     #     self.nav_status.update(new_nav_status)
@@ -157,10 +152,15 @@ class SensorFusion:
     async def run(self):
         # Main loop for running the filter and publishing to odom
         while True:
-            if self.filter is not None and self.state_estimate.fresh:
-                odom = self.state_estimate.asOdom()
-                self.lcm.publish('/odometry', odom.encode())
-                self.state_estimate.fresh = False
+            if self.filter is not None:
+                # Run filter if constructed and sensors are ready
+                self.filter.run(self.gps, self.imu, self.state_estimate, self.fresh_override)
+                self.gps.fresh = False
+                self.imu.fresh = False
+                if self.state_estimate.fresh:
+                    self.state_estimate.fresh = False
+                    odom = self.state_estimate.asOdom()
+                    self.lcm.publish('/odometry', odom.encode())
             await asyncio.sleep(self.config["UpdateRate"])
 
 

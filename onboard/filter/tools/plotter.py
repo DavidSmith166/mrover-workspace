@@ -23,7 +23,7 @@ class Plotter:
             self.data = np.genfromtxt(file_path + type + 'Log.csv',
                                      delimiter=',', dtype=dtype)
 
-    def plotCoords(self, subplot_loc):
+    def plotStatic(self, subplot_loc):
         # Plots the coordinates from data in the specified subplot
 
         # Convert DMS to decimal
@@ -146,7 +146,6 @@ class Plotter:
             self.plotBearing([2, 2, 4])
         elif data_type == 'filterSim':
             self.readCsv('gps', float, True)
-            gps = self.data
             self.plotPath('red', 'gps', [1, 1, 1])
             self.readCsv('truth', float, True)
             self.plotPath('black', 'truth', [1, 1, 1])
@@ -155,8 +154,8 @@ class Plotter:
             self.readCsv('odom', float, True)
             self.plotPath('blue', 'kalman filter', [1, 1, 1])
 
-            plot.xlabel('Latitude (degrees)')
-            plot.ylabel('Longitude (degrees)')
+            plot.xlabel('Latitude (meters)')
+            plot.ylabel('Longitude (meters)')
 
             self.readCsv('config', str, False)
             title += '\nParams: '
