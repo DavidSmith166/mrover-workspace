@@ -7,7 +7,6 @@ import asyncio
 from rover_common.aiohelper import run_coroutines
 from rover_msgs import IMU, GPS, SensorPackage, Odometry
 from .inputs import Gps, Phone, Imu, Velocity2D, PositionDegs
-from .logger import Logger
 from .linearKalman import LinearKalmanFilter
 from .conversions import meters2lat, meters2long, lat2meters, long2meters, \
                         decimal2min
@@ -165,8 +164,7 @@ class SensorFusion:
 
 def main():
     fuser = SensorFusion()
-    logger = Logger()
-    run_coroutines(fuser.lcm.loop(), logger.lcm.loop(), fuser.run())
+    run_coroutines(fuser.lcm.loop(), fuser.run())
 
 
 if __name__ == '__main__':
