@@ -4,6 +4,7 @@ import os
 import time
 
 from rover_common import aiolcm
+from rover_common.aiohelper import run_coroutines
 from rover_msgs import IMU, GPS, NavStatus, Odometry, \
                        SensorPackage
 
@@ -130,5 +131,10 @@ class Logger:
             self.mov_avg_millis = time.time()*1000
 
 
-if __name__ == "__main__":
+def main():
     logger = Logger()
+    run_coroutines(logger.lcm.loop())
+
+
+if __name__ == "__main__":
+    main()
