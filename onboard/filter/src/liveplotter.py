@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-# import matplotlib.animation as animation
+import matplotlib.animation as animation
 from matplotlib import style
 from enum import IntEnum
 from rover_common import aiolcm
@@ -47,20 +47,21 @@ class LivePlotter():
     async def run(self):
         self.fig = plt.figure()
         self.ax1 = self.fig.add_subplot(1, 1, 1)
+        self.ax1.set_xlim([-.0002, .0002])
+        self.ax1.set_ylim([-.0002, .0002])
         self.lines = [line for line, in [self.ax1.plot([], [], lw=3)] * len(DataTypes)]
-        # self.ani = animation.FuncAnimation(self.fig,
-        #                                    self.animate,
-        #                                    interval=self.interval,
-        #                                    blit=True)
+        self.ani = animation.FuncAnimation(self.fig,
+                                           self.animate,
+                                           interval=self.interval,
+                                           blit=True)
+
         plt.ion()
         plt.legend(labels=[t.name for t in DataTypes])
         while True:
             # Arbitrary time
-            if all(self.initialized):
-                for t in DataTypes:
-                    plt.scatter(*self.data[t], label=t.name)
-            else:
-                print(self.initialized)
+            # if all(self.initialized):
+            #     for t in DataTypes:
+            #         plt.scatter(*self.data[t], label=t.name)
             # plt.draw()
             plt.pause(0.001)
             await asyncio.sleep(0.001)
@@ -95,7 +96,6 @@ class LivePlotter():
         else:
             self.data[DataTypes.GPS] = [[lon] * self.length, [lat] * self.length]
             self.initialized[DataTypes.GPS] = True
-            print('wack 1')
 
     # def phone_callback(self, channel, msg):
     #     phone = SensorPackage.decode(msg)
@@ -118,7 +118,6 @@ class LivePlotter():
         else:
             self.data[DataTypes.ODOM] = [[lon] * self.length, [lat] * self.length]
             self.initialized[DataTypes.ODOM] = True
-            print('wack 2')
 
     # def mov_avg_callback(self, channel, msg):
     #     avg = Odometry.decode(msg)
