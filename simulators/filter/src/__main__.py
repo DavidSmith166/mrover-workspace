@@ -13,15 +13,17 @@ class Simulator:
     def __init__(self):
         # Fetch constants
         config_path = os.getenv('MROVER_CONFIG')
-        config_path += "/config_filter/simConfig.json"
-        with open(config_path, "r") as configJson:
+        sim_config_path = config_path + "/config_filter/simConfig.json"
+        with open(sim_config_path, "r") as configJson:
             config = json.load(configJson)
             self.GPS_UPDATE_RATE_MILLIS = config['gps_update_rate_millis']
             self.IMU_UPDATE_RATE_MILLIS = config['imu_update_rate_millis']
             self.DT_MILLIS = config['dt_s'] * 1000
-            self.SEND_RATE_MILLIS = config['send_rate_millis']
             self.CSV_MODE = config['csv_mode']
-            # self.NEW_PATH = config['new_path']
+        config_path += "/config_filter/config.json"
+        with open(config_path, "r") as configJson:
+            config = json.load(configJson)
+            self.SEND_RATE_MILLIS = config['UpdateRate'] * 1000
         self.GPS_DTS = int(self.GPS_UPDATE_RATE_MILLIS / self.DT_MILLIS)
         self.IMU_DTS = int(self.IMU_UPDATE_RATE_MILLIS / self.DT_MILLIS)
 
