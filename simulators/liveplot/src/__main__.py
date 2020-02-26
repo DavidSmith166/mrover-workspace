@@ -1,141 +1,84 @@
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from matplotlib import style
-from enum import IntEnum
-from rover_common import aiolcm
-from rover_msgs import GPS, Odometry
-from rover_common.aiohelper import run_coroutines
-# \ SensorPackage
-import asyncio
 
-# This should be moved to a config
+from matplotlib import style
+
+import sys
+import numpy as np
+
+
 SAMPLE_LENGTH = 5
 style.use('fivethirtyeight')
-# This should be moved to a config
-
-
-class DataTypes(IntEnum):
-    GPS = 0
-    ODOM = 1
-    # AVG = 2
-    # PHONE = 3
 
 
 class LivePlotter():
     '''
-    Class holding methods and members relevant to the live plotting of the
-    Rover's path based on odometry and sensor logs
-
-    Note for positioning inside a tuple the ordering will always be (lon, lat)
-    which corresponds to (x, y) in the cartesian plane
-
-    This plotter is only intended for gps data (or other absolute position methods)
+    This script is currently not as generic as it should be
+    and needs to be refactored.
     '''
     def __init__(self):
-        self.initialized = [False] * len(DataTypes)
         self.length = SAMPLE_LENGTH
-        self.data = {}
-        # Update interval in miliseconds
         self.interval = 5
-        # Subscribe to LCM channels
-        self.lcm = aiolcm.AsyncLCM()
-        self.lcm.subscribe("/gps", self.gps_callback)
-        # self.lcm.subscribe("/sensor_package", self.phone_callback)
-        self.lcm.subscribe("/odometry", self.odom_callback)
-        # Temp mov_avg filter
-        # self.lcm.subscribe("/mov_avg", self.mov_avg_callback)
+        self.log_path = sys.argv[1]
+        self.gps_data = self.readCSV('gps', float, True)
+        self.odom_data = self.readCSV('odom', float, True)
+        self.movAvg_data = self.readCSV('movAvg', float, True)
+        self.gps_window_start = 0
+        self.gps_window_end = self.length
+        self.odom__window_start = 0
+        self.odom_window_end = self.length
+        self.movAvg_window_start = 0
+        self.movAvg_window_end = self.length
+        self.gps_window = self.gps_data[:self.length]
+        self.odom_window = self.odom_data[:self.length]
+        self.movAvg_window = self.movAvg_data[:self.length]
 
-    async def run(self):
+    def readCSV(self, type, dtype, names_in):
+        # Reads in the CSV file specified by log
+        return np.genfromtxt(self.log_path + type + 'Log.csv',
+                             delimiter=',',
+                             names=True,
+                             dtype=dtype)
+
+    def run(self):
         self.fig = plt.figure()
         self.ax1 = self.fig.add_subplot(1, 1, 1)
         self.ax1.set_xlim([-.0002, .0002])
         self.ax1.set_ylim([-.0002, .0002])
-        self.lines = [line for line, in [self.ax1.plot([], [], lw=3)] * len(DataTypes)]
+        self.lines = [] * 3
         self.ani = animation.FuncAnimation(self.fig,
                                            self.animate,
                                            interval=self.interval,
                                            blit=True)
 
         plt.ion()
-        plt.legend(labels=[t.name for t in DataTypes])
-        while True:
-            # Arbitrary time
-            # if all(self.initialized):
-            #     for t in DataTypes:
-            #         plt.scatter(*self.data[t], label=t.name)
-            # plt.draw()
-            plt.pause(0.001)
-            await asyncio.sleep(0.001)
+        plt.legend(labels=["Raw", "Filtered", "Moving Average"])
+        plt.title('Live Comparison of Different Absolute Positioning Algorithms')
+        plt.show()
 
-    def add_measurement(self, key, values):
-        '''
-        Appends the new measurement to the end of the array
-        Removes the oldest measurement from the array
-
-        Expects list (lon, lat) for values
-        '''
-        self.data[key][0].append(values[0])
-        self.data[key][1].append(values[1])
-        # self.data[key][0] = self.data[key][0][1:]
-        # self.data[key][1] = self.data[key][1][1:]
+    def shift_windows(self):
+        self.gps_window_start += 1
+        self.gps_window_end += 1
+        self.odom__window_start += 1
+        self.odom_window_end += 1
+        self.movAvg_window_start += 1
+        self.movAvg_window_end += 1
+        # TODO bounds checking
+        self.gps_window = self.gps_data[self.gps_window_start:self.gps_window_end]
+        self.odom_window = self.odom_data[self.odom__window_start:self.odom_window_end]
+        self.movAvg_window = self.movAvg_data[self.movAvg_window_start:self.movAvg_window_end]
 
     def animate(self, frame, *args):
-        # self.ax1.clear()
-        if all(self.initialized):
-            for i, t in enumerate(DataTypes):
-                self.lines[i].set_data(*self.data[t])
+        self.shift_windows()
+        self.lines[0].set_data(self.gps_window)
+        self.lines[1].set_data(self.odom_window)
+        self.lines[2].set_data(self.movAvg_window)
         return self.lines
-
-    def gps_callback(self, channel, msg):
-        gps = GPS.decode(msg)
-        print(gps)
-        lon = gps.longitude_deg + gps.longitude_min / 60
-        lat = gps.latitude_deg + gps.latitude_min / 60
-        print('GPS', lon, lat)
-        if all(self.initialized):
-            self.add_measurement(DataTypes.GPS, (lon, lat))
-        else:
-            self.data[DataTypes.GPS] = [[lon] * self.length, [lat] * self.length]
-            self.initialized[DataTypes.GPS] = True
-
-    # def phone_callback(self, channel, msg):
-    #     phone = SensorPackage.decode(msg)
-    #     lon = phone.longitude_deg + phone.longitude_min / 60
-    #     lat = phone.latitude_deg + phone.latitude_min / 60
-    #     if all(self.initialized):
-    #         self.add_measurement(DataTypes.PHONE, (lon, lat))
-    #     else:
-    #         self.data[DataTypes.PHONE] = [[lon] * self.length, [lat] * self.length]
-    #         self.initialized[DataTypes.PHONE] = True
-
-    def odom_callback(self, channel, msg):
-        odom = Odometry.decode(msg)
-        print(odom)
-        lon = odom.longitude_deg + odom.longitude_min / 60
-        lat = odom.latitude_deg + odom.latitude_min / 60
-        print('Filter', lon, lat)
-        if all(self.initialized):
-            self.add_measurement(DataTypes.ODOM, (lon, lat))
-        else:
-            self.data[DataTypes.ODOM] = [[lon] * self.length, [lat] * self.length]
-            self.initialized[DataTypes.ODOM] = True
-
-    # def mov_avg_callback(self, channel, msg):
-    #     avg = Odometry.decode(msg)
-    #     print(avg)
-    #     lon = avg.longitude_deg + avg.longitude_min / 60
-    #     lat = avg.latitude_deg + avg.latitude_min / 60
-    #     if all(self.initialized):
-    #         self.add_measurement(DataTypes.AVG, (lon, lat))
-    #     else:
-    #         self.data[DataTypes.AVG] = [[lon] * self.length, [lat] * self.length]
-    #         self.initialized[DataTypes.AVG] = True
-    #         print('wack 3')
 
 
 def main():
     liveplotter = LivePlotter()
-    run_coroutines(liveplotter.lcm.loop(), liveplotter.run())
+    liveplotter.run()
 
 
 if __name__ == '__main__':
