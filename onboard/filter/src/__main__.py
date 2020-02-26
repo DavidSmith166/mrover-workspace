@@ -10,7 +10,6 @@ from .inputs import Gps, Phone, Imu, Velocity2D, PositionDegs
 from .linearKalman import LinearKalmanFilter
 from .conversions import meters2lat, meters2long, lat2meters, long2meters, \
                         decimal2min
-from .liveplotter import liveplotter
 # don't have nav status in here yet
 
 

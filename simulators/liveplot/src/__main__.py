@@ -4,6 +4,7 @@ from matplotlib import style
 from enum import IntEnum
 from rover_common import aiolcm
 from rover_msgs import GPS, Odometry
+from rover_common.aiohelper import run_coroutines
 # \ SensorPackage
 import asyncio
 
@@ -132,4 +133,10 @@ class LivePlotter():
     #         print('wack 3')
 
 
-liveplotter = LivePlotter()
+def main():
+    liveplotter = LivePlotter()
+    run_coroutines(liveplotter.lcm.loop(), liveplotter.run())
+
+
+if __name__ == '__main__':
+    main()
